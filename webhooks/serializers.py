@@ -1,0 +1,146 @@
+"""
+Serializers for webhook API endpoints.
+"""
+from rest_framework import serializers
+from django.utils import timezone
+from croniter import croniter
+from .models import Webhook, WebhookExecution
+
+
+class WebhookExecutionSerializer(serializers.ModelSerializer):
+    """Serializer for webhook execution history."""
+    
+    class Meta:
+        model = WebhookExecution
+        fields = [
+            'id', 'status', 'response_code', 'response_body', 
+            'error_message', 'attempt_number', 'executed_at'
+        ]
+        read_only_fields = fields
+
+
+class WebhookSerializer(serializers.ModelSerializer):
+    """Serializer for webhook CRUD operations."""
+    
+    execution_count = serializers.SerializerMethodField()
+    last_execution_status = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Webhook
+        fields = [
+            'id', 'name', 'url', 'http_method', 'headers', 'payload',
+            'schedule_type', 'cron_expression', 'scheduled_at', 'timezone',
+            'is_active', 'max_retries', 'retry_delay', 'timeout',
+            'last_execution_at', 'execution_count', 'last_execution_status',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['last_execution_at', 'created_at', 'updated_at']
+    
+    def get_execution_count(self, obj):
+        """Get total number of executions."""
+        return obj.executions.count()
+    
+    def get_last_execution_status(self, obj):
+        """Get status of last execution."""
+        last_execution = obj.executions.first()
+        return last_execution.status if last_execution else None
+    
+    def validate_cron_expression(self, value):
+        """Validate cron expression syntax."""
+        if value:
+            try:
+                croniter(value)
+            except Exception as e:
+                raise serializers.ValidationError(f"Invalid cron expression: {str(e)}")
+        return value
+    
+    def validate_scheduled_at(self, value):
+        """Validate scheduled datetime is in the future."""
+        if value and value <= timezone.now():
+            raise serializers.ValidationError("Scheduled time must be in the future")
+        return value
+    
+    def validate(self, data):
+        """Cross-field validation."""
+        schedule_type = data.get('schedule_type')
+        
+        # Validate one-time webhooks
+        if schedule_type == 'once':
+            if not data.get('scheduled_at'):
+                raise serializers.ValidationError({
+                    'scheduled_at': 'This field is required for one-time webhooks'
+                })
+            if data.get('cron_expression'):
+                raise serializers.ValidationError({
+                    'cron_expression': 'Cron expression should not be set for one-time webhooks'
+                })
+        
+        # Validate recurring webhooks
+        elif schedule_type == 'recurring':
+            if not data.get('cron_expression'):
+                raise serializers.ValidationError({
+                    'cron_expression': 'This field is required for recurring webhooks'
+                })
+            if data.get('scheduled_at'):
+                raise serializers.ValidationError({
+                    'scheduled_at': 'Scheduled time should not be set for recurring webhooks'
+                })
+        
+        return data
+    
+    def create(self, validated_data):
+        """Create webhook and schedule task."""
+        # Set user from request context
+        validated_data['user'] = self.context['request'].user
+        
+        webhook = super().create(validated_data)
+        
+        # Schedule the webhook
+        from .tasks import schedule_webhook
+        schedule_webhook(webhook.id)
+        
+        return webhook
+    
+    def update(self, instance, validated_data):
+        """Update webhook and reschedule if needed."""
+        # Cancel existing schedule
+        from .tasks import cancel_webhook_schedule
+        cancel_webhook_schedule(instance.id)
+        
+        # Update instance
+        webhook = super().update(instance, validated_data)
+        
+        # Reschedule if active
+        if webhook.is_active:
+            from .tasks import schedule_webhook
+            schedule_webhook(webhook.id)
+        
+        return webhook
+
+
+class WebhookCreateSerializer(WebhookSerializer):
+    """Serializer for creating webhooks with minimal fields."""
+    
+    class Meta(WebhookSerializer.Meta):
+        fields = [
+            'name', 'url', 'http_method', 'headers', 'payload',
+            'schedule_type', 'cron_expression', 'scheduled_at', 'timezone',
+            'max_retries', 'retry_delay', 'timeout'
+        ]
+
+
+class WebhookListSerializer(serializers.ModelSerializer):
+    """Lightweight serializer for listing webhooks."""
+    
+    execution_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Webhook
+        fields = [
+            'id', 'name', 'url', 'http_method', 'schedule_type',
+            'is_active', 'last_execution_at', 'execution_count', 'created_at'
+        ]
+        read_only_fields = fields
+    
+    def get_execution_count(self, obj):
+        return obj.executions.count()

@@ -1,0 +1,263 @@
+{
+  "info": {
+    "name": "CronHooks API",
+    "description": "API collection for CronHooks webhook scheduling service",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{auth_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000/api",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Get Auth Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.collectionVariables.set('auth_token', pm.response.json().token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"your_username\",\n  \"password\": \"your_password\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/token/",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "token", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Webhooks",
+      "item": [
+        {
+          "name": "Create One-Time Webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"One-time notification\",\n  \"url\": \"https://webhook.site/your-unique-url\",\n  \"http_method\": \"POST\",\n  \"schedule_type\": \"once\",\n  \"scheduled_at\": \"2025-10-25T15:00:00Z\",\n  \"headers\": {\n    \"X-Custom-Header\": \"value\"\n  },\n  \"payload\": {\n    \"message\": \"Hello from CronHooks\"\n  },\n  \"timeout\": 30,\n  \"max_retries\": 3,\n  \"retry_delay\": 60\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/webhooks/",
+              "host": ["{{base_url}}"],
+              "path": ["webhooks", ""]
+            }
+          }
+        },
+        {
+          "name": "Create Recurring Webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Every 5 minutes\",\n  \"url\": \"https://webhook.site/your-unique-url\",\n  \"http_method\": \"POST\",\n  \"schedule_type\": \"recurring\",\n  \"cron_expression\": \"*/5 * * * *\",\n  \"timezone\": \"UTC\",\n  \"headers\": {},\n  \"payload\": {\n    \"status\": \"check\"\n  },\n  \"timeout\": 30,\n  \"max_retries\": 3\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/webhooks/",
+              "host": ["{{base_url}}"],
+              "path": ["webhooks", ""]
+            }
+          }
+        },
+        {
+          "name": "List Webhooks",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/webhooks/",
+              "host": ["{{base_url}}"],
+              "path": ["webhooks", ""]
+            }
+          }
+        },
+        {
+          "name": "List Active Webhooks",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/webhooks/?is_active=true",
+              "host": ["{{base_url}}"],
+              "path": ["webhooks", ""],
+              "query": [
+                {
+                  "key": "is_active",
+                  "value": "true"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Webhook Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/webhooks/:id/",
+              "host": ["{{base_url}}"],
+              "path": ["webhooks", ":id", ""],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Webhook",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated name\",\n  \"url\": \"https://webhook.site/new-url\",\n  \"http_method\": \"POST\",\n  \"schedule_type\": \"recurring\",\n  \"cron_expression\": \"*/10 * * * *\",\n  \"headers\": {},\n  \"payload\": {}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/webhooks/:id/",
+              "host": ["{{base_url}}"],
+              "path": ["webhooks", ":id", ""],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Cancel Webhook",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/webhooks/:id/cancel/",
+              "host": ["{{base_url}}"],
+              "path": ["webhooks", ":id", "cancel", ""],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Activate Webhook",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/webhooks/:id/activate/",
+              "host": ["{{base_url}}"],
+              "path": ["webhooks", ":id", "activate", ""],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Execution History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/webhooks/:id/executions/",
+              "host": ["{{base_url}}"],
+              "path": ["webhooks", ":id", "executions", ""],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Webhook",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/webhooks/:id/",
+              "host": ["{{base_url}}"],
+              "path": ["webhooks", ":id", ""],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
