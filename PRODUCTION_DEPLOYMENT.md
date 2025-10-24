@@ -251,7 +251,7 @@ pip freeze > requirements.txt
 
 ```bash
 # Reload systemd to recognize new services
-sudo systemctl daemon-reload
+sudo systemctl ddaemonaemon-reload
 
 # Enable services (start on boot)
 sudo systemctl enable cronhooks-web
