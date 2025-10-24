@@ -36,10 +36,6 @@ sleep 5
 
 # Clear any cached DATABASE_URL from environment
 # This ensures Django reads fresh from .env file
-unset DATABASE_URL
-unset REDIS_URL
-unset CELERY_BROKER_URL
-unset CELERY_RESULT_BACKEND
 
 # Create migrations for webhooks app
 echo "📝 Creating migrations for webhooks app..."

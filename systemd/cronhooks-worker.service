@@ -1,0 +1,38 @@
+[Unit]
+Description=CronHooks Celery Worker
+After=network.target postgresql.service redis.service
+Wants=postgresql.service redis.service
+
+[Service]
+Type=simple
+User=cronhooks
+Group=cronhooks
+WorkingDirectory=/opt/cronhooks
+Environment="PATH=/opt/cronhooks/venv/bin"
+EnvironmentFile=/opt/cronhooks/.env
+
+# Celery worker command
+ExecStart=/opt/cronhooks/venv/bin/celery \
+    -A config \
+    worker \
+    --loglevel=info \
+    --concurrency=4 \
+    --max-tasks-per-child=1000
+
+# Restart policy
+Restart=always
+RestartSec=10s
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cronhooks-worker
+
+[Install]
+WantedBy=multi-user.target

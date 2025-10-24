@@ -1,0 +1,38 @@
+[Unit]
+Description=CronHooks Django Web Application
+After=network.target postgresql.service redis.service
+Wants=postgresql.service redis.service
+
+[Service]
+Type=notify
+User=cronhooks
+Group=cronhooks
+WorkingDirectory=/opt/cronhooks
+Environment="PATH=/opt/cronhooks/venv/bin"
+EnvironmentFile=/opt/cronhooks/.env
+
+# Gunicorn command
+ExecStart=/opt/cronhooks/venv/bin/gunicorn \
+    --bind 127.0.0.1:8000 \
+    --workers 4 \
+    --timeout 120 \
+    --access-logfile /var/log/cronhooks/access.log \
+    --error-logfile /var/log/cronhooks/error.log \
+    --log-level info \
+    config.wsgi:application
+
+# Restart policy
+Restart=always
+RestartSec=10s
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cronhooks-web
+
+[Install]
+WantedBy=multi-user.target
