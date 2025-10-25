@@ -90,20 +90,20 @@ export default function ExecutionsPage() {
                     key={webhook.id}
                     className={`cursor-pointer transition-all hover:shadow-md ${
                       selectedWebhook?.id === webhook.id
-                        ? 'ring-2 ring-purple-500 bg-purple-50 dark:bg-purple-950'
-                        : 'hover:bg-slate-50 dark:hover:bg-slate-900'
+                        ? 'ring-2 ring-purple-500 bg-purple-100 dark:bg-purple-900/30'
+                        : 'hover:bg-slate-100 dark:hover:bg-slate-700/50'
                     }`}
                     onClick={() => setSelectedWebhook(webhook)}
                   >
                     <CardContent className="p-4">
                       <div className="space-y-2">
                         <div className="flex items-start justify-between">
-                          <h3 className="font-semibold text-sm">{webhook.name}</h3>
+                          <h3 className="font-semibold text-sm text-slate-900">{webhook.name}</h3>
                           <Badge variant={webhook.is_active ? 'default' : 'secondary'}>
                             {webhook.is_active ? 'Active' : 'Inactive'}
                           </Badge>
                         </div>
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <div className="flex items-center justify-between text-xs text-slate-600">
                           <div className="flex items-center gap-2">
                             <Activity className="h-3 w-3" />
                             <span>{webhook.execution_count || 0} executions</span>
