@@ -7,13 +7,26 @@ import { formatUTCForDisplay } from '@/lib/timezone-utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Pencil, Trash2, Play, Pause } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Plus, Trash2, Clock } from 'lucide-react';
 import WebhookDialog from '@/components/webhooks/WebhookDialog';
 
 export default function WebhooksPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedWebhook, setSelectedWebhook] = useState<Webhook | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [showPastTimeAlert, setShowPastTimeAlert] = useState(false);
+  const [pastTimeWebhook, setPastTimeWebhook] = useState<Webhook | null>(null);
   const queryClient = useQueryClient();
 
   const { data: webhooks, isLoading } = useQuery({
@@ -35,22 +48,36 @@ export default function WebhooksPage() {
   const toggleActiveMutation = useMutation({
     mutationFn: ({ id, is_active }: { id: number; is_active: boolean }) =>
       is_active ? webhooksApi.cancel(id) : webhooksApi.activate(id),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['webhooks'] });
-      toast.success('Webhook status updated');
+      const message = data?.detail || 'Webhook status updated';
+      toast.success(message);
     },
-    onError: () => {
-      toast.error('Failed to update webhook status');
+    onError: (error: any, variables) => {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message ||
+                          error.message ||
+                          'Failed to update webhook status';
+      
+      // Check if error is due to past scheduled time
+      if (errorMessage.includes('scheduled time is in the past')) {
+        // Find the webhook that failed
+        const failedWebhook = webhooks?.find(w => w.id === variables.id);
+        if (failedWebhook) {
+          setPastTimeWebhook(failedWebhook);
+          setShowPastTimeAlert(true);
+        }
+      } else {
+        toast.error(errorMessage);
+      }
+      
+      // Refresh webhook list to sync UI
+      queryClient.invalidateQueries({ queryKey: ['webhooks'] });
     },
   });
 
   const handleCreate = () => {
     setSelectedWebhook(null);
-    setIsDialogOpen(true);
-  };
-
-  const handleEdit = (webhook: Webhook) => {
-    setSelectedWebhook(webhook);
     setIsDialogOpen(true);
   };
 
@@ -80,6 +107,22 @@ export default function WebhooksPage() {
       id: webhook.id,
       is_active: webhook.is_active,
     });
+  };
+
+  const handleUpdateFromAlert = async () => {
+    if (pastTimeWebhook) {
+      setShowPastTimeAlert(false);
+      // Fetch full webhook details and open edit dialog
+      try {
+        const webhookDetails = await webhooksApi.getById(pastTimeWebhook.id);
+        setSelectedWebhook(webhookDetails);
+        setIsDialogOpen(true);
+        setPastTimeWebhook(null);
+      } catch (error) {
+        toast.error('Failed to load webhook details');
+        console.error('Error loading webhook details:', error);
+      }
+    }
   };
 
   if (isLoading) {
@@ -163,31 +206,20 @@ export default function WebhooksPage() {
                   )}
                 </div>
 
-                <div className="flex items-center space-x-2 mt-4">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleActive(webhook);
-                    }}
-                  >
-                    {webhook.is_active ? (
-                      <Pause className="h-4 w-4" />
-                    ) : (
-                      <Play className="h-4 w-4" />
-                    )}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEdit(webhook);
-                    }}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
+                <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-muted-foreground">
+                      {webhook.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                    <Switch
+                      checked={webhook.is_active}
+                      onCheckedChange={() => {
+                        // Toggle webhook active state
+                        handleToggleActive(webhook);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
                   <Button
                     size="sm"
                     variant="outline"
@@ -210,6 +242,34 @@ export default function WebhooksPage() {
         onClose={() => setIsDialogOpen(false)}
         webhook={selectedWebhook}
       />
+
+      {/* Alert for past scheduled time */}
+      <AlertDialog open={showPastTimeAlert} onOpenChange={setShowPastTimeAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-amber-500" />
+              Scheduled Time Has Passed
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                The webhook <strong>"{pastTimeWebhook?.name}"</strong> cannot be activated because its scheduled time is in the past.
+              </p>
+              <p className="text-sm">
+                Would you like to update the scheduled time to activate this webhook?
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPastTimeWebhook(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleUpdateFromAlert}>
+              Update Webhook
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
