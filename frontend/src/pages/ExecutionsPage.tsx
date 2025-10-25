@@ -206,7 +206,7 @@ export default function ExecutionsPage() {
                               <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
                                 View Response Body
                               </summary>
-                              <pre className="mt-2 p-2 bg-slate-100 dark:bg-slate-900 rounded text-xs overflow-x-auto">
+                              <pre className="mt-2 p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs overflow-x-auto text-slate-900 dark:text-slate-100">
                                 {JSON.stringify(JSON.parse(execution.response_body), null, 2)}
                               </pre>
                             </details>
