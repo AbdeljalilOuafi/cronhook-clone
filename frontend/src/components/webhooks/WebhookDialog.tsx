@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import * as z from 'zod';
 import { webhooksApi } from '@/api/webhooks';
 import type { Webhook, CreateWebhookRequest } from '@/types';
+import { convertLocalToUTC, convertUTCToLocal } from '@/lib/timezone-utils';
 import {
   Dialog,
   DialogContent,
@@ -96,7 +97,8 @@ export default function WebhookDialog({ open, onClose, webhook }: WebhookDialogP
         headers: JSON.stringify(webhook.headers, null, 2),
         payload: typeof webhook.payload === 'string' ? webhook.payload : JSON.stringify(webhook.payload, null, 2),
         schedule_type: webhook.schedule_type,
-        scheduled_at: webhook.scheduled_at,
+        // Convert UTC to local time for the datetime-local input
+        scheduled_at: webhook.scheduled_at ? convertUTCToLocal(webhook.scheduled_at) : undefined,
         cron_expression: webhook.cron_expression,
         timezone: webhook.timezone,
         max_retries: webhook.max_retries,
@@ -155,7 +157,8 @@ export default function WebhookDialog({ open, onClose, webhook }: WebhookDialogP
 
     // Only include the relevant schedule field based on schedule_type
     if (data.schedule_type === 'once') {
-      payload.scheduled_at = data.scheduled_at;
+      // Convert local datetime to UTC before sending to backend
+      payload.scheduled_at = data.scheduled_at ? convertLocalToUTC(data.scheduled_at) : undefined;
     } else if (data.schedule_type === 'recurring') {
       payload.cron_expression = data.cron_expression;
       payload.timezone = data.timezone;
@@ -245,6 +248,9 @@ export default function WebhookDialog({ open, onClose, webhook }: WebhookDialogP
                     {...register('scheduled_at')}
                     className={errors.scheduled_at ? 'border-destructive' : ''}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Enter time in your local timezone. It will be converted to UTC automatically.
+                  </p>
                   {errors.scheduled_at && (
                     <p className="text-sm text-destructive">
                       {errors.scheduled_at.message}

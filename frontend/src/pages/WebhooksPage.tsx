@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { webhooksApi } from '@/api/webhooks';
 import type { Webhook } from '@/types';
+import { formatUTCForDisplay } from '@/lib/timezone-utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -126,7 +127,7 @@ export default function WebhooksPage() {
                     <div>
                       <span className="text-muted-foreground">Scheduled:</span>{' '}
                       <span className="font-medium">
-                        {new Date(webhook.scheduled_at).toLocaleString()}
+                        {formatUTCForDisplay(webhook.scheduled_at)}
                       </span>
                     </div>
                   )}

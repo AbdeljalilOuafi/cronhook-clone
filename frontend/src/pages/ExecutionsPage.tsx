@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { webhooksApi } from '@/api/webhooks';
+import { formatUTCForDisplay } from '@/lib/timezone-utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -95,7 +96,7 @@ export default function ExecutionsPage() {
                       #{execution.webhook}
                     </TableCell>
                     <TableCell className="text-sm">
-                      {new Date(execution.executed_at).toLocaleString()}
+                      {formatUTCForDisplay(execution.executed_at)}
                     </TableCell>
                     <TableCell>
                       {execution.response_code ? (
