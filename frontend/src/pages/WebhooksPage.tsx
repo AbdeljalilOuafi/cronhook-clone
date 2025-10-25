@@ -13,6 +13,7 @@ import WebhookDialog from '@/components/webhooks/WebhookDialog';
 export default function WebhooksPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedWebhook, setSelectedWebhook] = useState<Webhook | null>(null);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: webhooks, isLoading } = useQuery({
@@ -51,6 +52,21 @@ export default function WebhooksPage() {
   const handleEdit = (webhook: Webhook) => {
     setSelectedWebhook(webhook);
     setIsDialogOpen(true);
+  };
+
+  const handleCardClick = async (webhookId: number) => {
+    setIsLoadingDetails(true);
+    try {
+      // Fetch full webhook details from the API
+      const webhookDetails = await webhooksApi.getById(webhookId);
+      setSelectedWebhook(webhookDetails);
+      setIsDialogOpen(true);
+    } catch (error) {
+      toast.error('Failed to load webhook details');
+      console.error('Error loading webhook details:', error);
+    } finally {
+      setIsLoadingDetails(false);
+    }
   };
 
   const handleDelete = (id: number) => {
@@ -101,7 +117,13 @@ export default function WebhooksPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {webhooks?.map((webhook) => (
-            <Card key={webhook.id}>
+            <Card 
+              key={webhook.id}
+              className={`cursor-pointer transition-all hover:shadow-lg hover:border-primary/50 ${
+                isLoadingDetails ? 'opacity-50 pointer-events-none' : ''
+              }`}
+              onClick={() => handleCardClick(webhook.id)}
+            >
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -145,7 +167,10 @@ export default function WebhooksPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => handleToggleActive(webhook)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleActive(webhook);
+                    }}
                   >
                     {webhook.is_active ? (
                       <Pause className="h-4 w-4" />
@@ -156,14 +181,20 @@ export default function WebhooksPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => handleEdit(webhook)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEdit(webhook);
+                    }}
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => handleDelete(webhook.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(webhook.id);
+                    }}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
