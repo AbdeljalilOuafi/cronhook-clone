@@ -27,6 +27,8 @@ export default function WebhooksPage() {
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [showPastTimeAlert, setShowPastTimeAlert] = useState(false);
   const [pastTimeWebhook, setPastTimeWebhook] = useState<Webhook | null>(null);
+  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
+  const [webhookToDelete, setWebhookToDelete] = useState<Webhook | null>(null);
   const queryClient = useQueryClient();
 
   const { data: webhooks, isLoading } = useQuery({
@@ -96,9 +98,16 @@ export default function WebhooksPage() {
     }
   };
 
-  const handleDelete = (id: number) => {
-    if (confirm('Are you sure you want to delete this webhook?')) {
-      deleteMutation.mutate(id);
+  const handleDelete = (webhook: Webhook) => {
+    setWebhookToDelete(webhook);
+    setShowDeleteAlert(true);
+  };
+
+  const confirmDelete = () => {
+    if (webhookToDelete) {
+      deleteMutation.mutate(webhookToDelete.id);
+      setShowDeleteAlert(false);
+      setWebhookToDelete(null);
     }
   };
 
@@ -225,10 +234,10 @@ export default function WebhooksPage() {
                     variant="outline"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleDelete(webhook.id);
+                      handleDelete(webhook);
                     }}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="h-4 w-4 text-red-400 hover:text-red-500" />
                   </Button>
                 </div>
               </CardContent>
@@ -266,6 +275,37 @@ export default function WebhooksPage() {
             </AlertDialogCancel>
             <AlertDialogAction onClick={handleUpdateFromAlert}>
               Update Webhook
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-red-500" />
+              Delete Webhook
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                Are you sure you want to delete <strong>"{webhookToDelete?.name}"</strong>?
+              </p>
+              <p className="text-sm text-amber-600 dark:text-amber-500">
+                This action cannot be undone. The webhook and all its execution history will be permanently removed.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setWebhookToDelete(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete}
+              className="bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700"
+            >
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
