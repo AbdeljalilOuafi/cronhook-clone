@@ -48,9 +48,4 @@ export const webhooksApi = {
     );
     return response.data.results;
   },
-
-  getAllExecutions: async (): Promise<WebhookExecution[]> => {
-    const response = await apiClient.get<PaginatedResponse<WebhookExecution>>('/executions/');
-    return response.data.results;
-  },
 };
