@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Folder } from 'lucide-react';
 
 const webhookSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -74,9 +75,10 @@ interface WebhookDialogProps {
   open: boolean;
   onClose: () => void;
   webhook: Webhook | null;
+  defaultFolderId?: number | null;
 }
 
-export default function WebhookDialog({ open, onClose, webhook }: WebhookDialogProps) {
+export default function WebhookDialog({ open, onClose, webhook, defaultFolderId }: WebhookDialogProps) {
   const queryClient = useQueryClient();
   const isEditing = !!webhook;
 
@@ -135,9 +137,10 @@ export default function WebhookDialog({ open, onClose, webhook }: WebhookDialogP
         timeout: 30,
         cron_expression: undefined,
         scheduled_at: undefined,
+        folder: defaultFolderId !== undefined ? defaultFolderId : null,
       });
     }
-  }, [webhook, reset]);
+  }, [webhook, reset, defaultFolderId]);
 
   const createMutation = useMutation({
     mutationFn: webhooksApi.create,
@@ -340,33 +343,48 @@ export default function WebhookDialog({ open, onClose, webhook }: WebhookDialogP
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="folder">Folder (Optional)</Label>
-                <Select
-                  value={watch('folder')?.toString() || 'none'}
-                  onValueChange={(value) => setValue('folder', value === 'none' ? null : Number(value))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="No folder" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No folder</SelectItem>
-                    {folders.map((folder) => (
-                      <SelectItem key={folder.id} value={folder.id.toString()}>
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-2 h-2 rounded-full"
-                            style={{ backgroundColor: folder.color }}
-                          />
-                          {folder.full_path || folder.name}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            {/* Only show folder selector when creating from "All Webhooks" or when editing */}
+            {(isEditing || defaultFolderId === null) && (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="folder">Folder (Optional)</Label>
+                  <Select
+                    value={watch('folder')?.toString() || 'none'}
+                    onValueChange={(value) => setValue('folder', value === 'none' ? null : Number(value))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="No folder" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No folder</SelectItem>
+                      {folders.map((folder) => (
+                        <SelectItem key={folder.id} value={folder.id.toString()}>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-2 h-2 rounded-full"
+                              style={{ backgroundColor: folder.color }}
+                            />
+                            {folder.full_path || folder.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Show folder indicator when creating in a specific folder */}
+            {!isEditing && defaultFolderId !== null && (
+              <div className="p-3 bg-purple-50 border border-purple-200 rounded-md">
+                <div className="flex items-center gap-2 text-sm">
+                  <Folder className="w-4 h-4 text-purple-600" />
+                  <span className="text-purple-900">
+                    Creating in folder: <strong>{folders.find(f => f.id === defaultFolderId)?.name || 'Selected folder'}</strong>
+                  </span>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="url">URL *</Label>

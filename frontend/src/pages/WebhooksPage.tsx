@@ -296,6 +296,7 @@ export default function WebhooksPage() {
         open={isDialogOpen}
         onClose={() => setIsDialogOpen(false)}
         webhook={selectedWebhook}
+        defaultFolderId={selectedFolderId}
       />
 
       {/* Alert for past scheduled time */}
