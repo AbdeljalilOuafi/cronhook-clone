@@ -9,6 +9,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -18,10 +24,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, Clock } from 'lucide-react';
+import { Plus, Trash2, Clock, MoreVertical, FolderInput } from 'lucide-react';
 import WebhookDialog from '@/components/webhooks/WebhookDialog';
 import { FolderSidebar } from '@/components/folders/FolderSidebar';
 import { FolderBadge } from '@/components/folders/FolderBadge';
+import { MoveWebhookDialog } from '@/components/webhooks/MoveWebhookDialog';
 
 export default function WebhooksPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -32,6 +39,8 @@ export default function WebhooksPage() {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [webhookToDelete, setWebhookToDelete] = useState<Webhook | null>(null);
   const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
+  const [showMoveDialog, setShowMoveDialog] = useState(false);
+  const [webhookToMove, setWebhookToMove] = useState<Webhook | null>(null);
   const queryClient = useQueryClient();
 
   const { data: webhooks, isLoading } = useQuery({
@@ -180,14 +189,13 @@ export default function WebhooksPage() {
           {webhooks?.map((webhook) => (
             <Card 
               key={webhook.id}
-              className={`cursor-pointer transition-all hover:shadow-lg hover:border-primary/50 ${
+              className={`transition-all hover:shadow-lg hover:border-primary/50 ${
                 isLoadingDetails ? 'opacity-50 pointer-events-none' : ''
               }`}
-              onClick={() => handleCardClick(webhook.id)}
             >
               <CardHeader>
                 <div className="flex items-start justify-between">
-                  <div className="flex-1">
+                  <div className="flex-1 cursor-pointer" onClick={() => handleCardClick(webhook.id)}>
                     <CardTitle className="text-lg">{webhook.name}</CardTitle>
                     {webhook.folder_name && webhook.folder_color && (
                       <div className="mt-2">
@@ -201,12 +209,33 @@ export default function WebhooksPage() {
                       {webhook.http_method} {webhook.url}
                     </CardDescription>
                   </div>
-                  <Badge variant={webhook.is_active ? 'default' : 'secondary'}>
-                    {webhook.is_active ? 'Active' : 'Inactive'}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={webhook.is_active ? 'default' : 'secondary'}>
+                      {webhook.is_active ? 'Active' : 'Inactive'}
+                    </Badge>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setWebhookToMove(webhook);
+                            setShowMoveDialog(true);
+                          }}
+                        >
+                          <FolderInput className="mr-2 h-4 w-4" />
+                          <span>Move...</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent onClick={() => handleCardClick(webhook.id)} className="cursor-pointer">
                 <div className="space-y-2 text-sm">
                   <div>
                     <span className="text-muted-foreground">Type:</span>{' '}
@@ -327,6 +356,15 @@ export default function WebhooksPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Move webhook dialog */}
+      {webhookToMove && (
+        <MoveWebhookDialog
+          open={showMoveDialog}
+          onOpenChange={setShowMoveDialog}
+          webhook={webhookToMove}
+        />
+      )}
     </div>
   </div>
   );
