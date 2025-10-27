@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import * as z from 'zod';
 import { webhooksApi } from '@/api/webhooks';
+import { foldersApi } from '@/api/folders';
 import type { Webhook, CreateWebhookRequest } from '@/types';
 import { convertLocalToUTC, convertUTCToLocal } from '@/lib/timezone-utils';
 import {
@@ -39,6 +40,7 @@ const webhookSchema = z.object({
   max_retries: z.number().min(0).max(10).optional(),
   retry_delay: z.number().min(0).optional(),
   timeout: z.number().min(1).optional(),
+  folder: z.number().nullable().optional(),
 }).refine(
   (data) => {
     if (data.schedule_type === 'once') {
@@ -78,6 +80,12 @@ export default function WebhookDialog({ open, onClose, webhook }: WebhookDialogP
   const queryClient = useQueryClient();
   const isEditing = !!webhook;
 
+  const { data: folders = [] } = useQuery({
+    queryKey: ['folders'],
+    queryFn: foldersApi.getAll,
+    enabled: open,
+  });
+
   const {
     register,
     handleSubmit,
@@ -115,6 +123,7 @@ export default function WebhookDialog({ open, onClose, webhook }: WebhookDialogP
         max_retries: webhook.max_retries,
         retry_delay: webhook.retry_delay,
         timeout: webhook.timeout,
+        folder: webhook.folder || null,
       });
     } else {
       reset({
@@ -235,6 +244,7 @@ export default function WebhookDialog({ open, onClose, webhook }: WebhookDialogP
         max_retries: data.max_retries,
         retry_delay: data.retry_delay,
         timeout: data.timeout,
+        folder: data.folder || null,
       };
 
       // Only include the relevant schedule field based on schedule_type
@@ -325,6 +335,34 @@ export default function WebhookDialog({ open, onClose, webhook }: WebhookDialogP
                     <SelectItem value="PUT">PUT</SelectItem>
                     <SelectItem value="PATCH">PATCH</SelectItem>
                     <SelectItem value="DELETE">DELETE</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="folder">Folder (Optional)</Label>
+                <Select
+                  value={watch('folder')?.toString() || 'none'}
+                  onValueChange={(value) => setValue('folder', value === 'none' ? null : Number(value))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="No folder" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No folder</SelectItem>
+                    {folders.map((folder) => (
+                      <SelectItem key={folder.id} value={folder.id.toString()}>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-2 h-2 rounded-full"
+                            style={{ backgroundColor: folder.color }}
+                          />
+                          {folder.full_path || folder.name}
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

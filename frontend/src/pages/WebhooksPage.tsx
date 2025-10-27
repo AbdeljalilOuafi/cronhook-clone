@@ -20,6 +20,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Plus, Trash2, Clock } from 'lucide-react';
 import WebhookDialog from '@/components/webhooks/WebhookDialog';
+import { FolderSidebar } from '@/components/folders/FolderSidebar';
+import { FolderBadge } from '@/components/folders/FolderBadge';
 
 export default function WebhooksPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -29,11 +31,12 @@ export default function WebhooksPage() {
   const [pastTimeWebhook, setPastTimeWebhook] = useState<Webhook | null>(null);
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [webhookToDelete, setWebhookToDelete] = useState<Webhook | null>(null);
+  const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
   const queryClient = useQueryClient();
 
   const { data: webhooks, isLoading } = useQuery({
-    queryKey: ['webhooks'],
-    queryFn: webhooksApi.getAll,
+    queryKey: ['webhooks', selectedFolderId],
+    queryFn: () => webhooksApi.getAll(selectedFolderId !== null ? { folder: selectedFolderId } : undefined),
   });
 
   const deleteMutation = useMutation({
@@ -143,19 +146,25 @@ export default function WebhooksPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold">Webhooks</h2>
-          <p className="text-muted-foreground">
-            Manage your scheduled HTTP requests
-          </p>
+    <div className="flex h-full">
+      <FolderSidebar
+        selectedFolderId={selectedFolderId}
+        onSelectFolder={setSelectedFolderId}
+      />
+      
+      <div className="flex-1 p-6 space-y-6 overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold">Webhooks</h2>
+            <p className="text-muted-foreground">
+              Manage your scheduled HTTP requests
+            </p>
+          </div>
+          <Button onClick={handleCreate} className="flex items-center space-x-2">
+            <Plus className="h-4 w-4" />
+            <span>New Webhook</span>
+          </Button>
         </div>
-        <Button onClick={handleCreate} className="flex items-center space-x-2">
-          <Plus className="h-4 w-4" />
-          <span>New Webhook</span>
-        </Button>
-      </div>
 
       {webhooks && webhooks.length === 0 ? (
         <Card>
@@ -180,6 +189,14 @@ export default function WebhooksPage() {
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <CardTitle className="text-lg">{webhook.name}</CardTitle>
+                    {webhook.folder_name && webhook.folder_color && (
+                      <div className="mt-2">
+                        <FolderBadge 
+                          name={webhook.folder_name} 
+                          color={webhook.folder_color}
+                        />
+                      </div>
+                    )}
                     <CardDescription className="mt-1">
                       {webhook.http_method} {webhook.url}
                     </CardDescription>
@@ -311,5 +328,6 @@ export default function WebhooksPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  </div>
   );
 }

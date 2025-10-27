@@ -8,8 +8,8 @@ import type {
 } from '@/types';
 
 export const webhooksApi = {
-  getAll: async (): Promise<Webhook[]> => {
-    const response = await apiClient.get<PaginatedResponse<Webhook>>('/webhooks/');
+  getAll: async (params?: { folder?: number | null }): Promise<Webhook[]> => {
+    const response = await apiClient.get<PaginatedResponse<Webhook>>('/webhooks/', { params });
     return response.data.results;
   },
 
@@ -47,5 +47,13 @@ export const webhooksApi = {
       `/webhooks/${webhookId}/executions/`
     );
     return response.data.results;
+  },
+
+  bulkMove: async (webhookIds: number[], folderId: number | null): Promise<{ detail: string; count: number }> => {
+    const response = await apiClient.post('/webhooks/bulk_move/', {
+      webhook_ids: webhookIds,
+      folder_id: folderId,
+    });
+    return response.data;
   },
 };

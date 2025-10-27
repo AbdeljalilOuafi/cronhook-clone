@@ -14,6 +14,31 @@ export interface LoginResponse {
   user: User;
 }
 
+export interface WebhookFolder {
+  id: number;
+  name: string;
+  description: string;
+  color: string;
+  icon: string;
+  parent: number | null;
+  webhook_count: number;
+  total_webhook_count: number;
+  full_path: string;
+  subfolders: WebhookFolder[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateFolderRequest {
+  name: string;
+  description?: string;
+  color?: string;
+  icon?: string;
+  parent?: number | null;
+}
+
+export interface UpdateFolderRequest extends Partial<CreateFolderRequest> {}
+
 export interface Webhook {
   id: number;
   name: string;
@@ -29,6 +54,9 @@ export interface Webhook {
   max_retries: number;
   retry_delay: number;
   timeout: number;
+  folder?: number | null;
+  folder_name?: string;
+  folder_color?: string;
   last_execution_at?: string | null;
   execution_count: number;
   last_execution_status?: 'success' | 'failed' | 'pending' | 'retrying' | null;
@@ -63,6 +91,7 @@ export interface CreateWebhookRequest {
   max_retries?: number;
   retry_delay?: number;
   timeout?: number;
+  folder?: number | null;
 }
 
 export interface UpdateWebhookRequest extends Partial<CreateWebhookRequest> {
