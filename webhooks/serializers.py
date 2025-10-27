@@ -4,7 +4,51 @@ Serializers for webhook API endpoints.
 from rest_framework import serializers
 from django.utils import timezone
 from croniter import croniter
-from .models import Webhook, WebhookExecution
+from .models import Webhook, WebhookExecution, WebhookFolder
+
+
+class WebhookFolderSerializer(serializers.ModelSerializer):
+    """Serializer for webhook folders."""
+    
+    webhook_count = serializers.ReadOnlyField()
+    total_webhook_count = serializers.ReadOnlyField()
+    full_path = serializers.ReadOnlyField()
+    subfolders = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = WebhookFolder
+        fields = [
+            'id', 'name', 'description', 'color', 'icon', 
+            'parent', 'webhook_count', 'total_webhook_count', 
+            'full_path', 'subfolders', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+    
+    def get_subfolders(self, obj):
+        """Get immediate subfolders (not recursive)."""
+        subfolders = obj.subfolders.all()
+        return WebhookFolderSerializer(subfolders, many=True, context=self.context).data
+    
+    def create(self, validated_data):
+        """Create folder and set user from request context."""
+        validated_data['user'] = self.context['request'].user
+        return super().create(validated_data)
+    
+    def validate(self, data):
+        """Validate folder constraints."""
+        # Check for circular references in parent-child relationship
+        parent = data.get('parent')
+        if parent and self.instance:
+            # Check if trying to set parent to self or a descendant
+            current = parent
+            while current:
+                if current.id == self.instance.id:
+                    raise serializers.ValidationError({
+                        'parent': 'Cannot create circular folder references'
+                    })
+                current = current.parent
+        
+        return data
 
 
 class WebhookExecutionSerializer(serializers.ModelSerializer):
@@ -24,6 +68,8 @@ class WebhookSerializer(serializers.ModelSerializer):
     
     execution_count = serializers.SerializerMethodField()
     last_execution_status = serializers.SerializerMethodField()
+    folder_name = serializers.CharField(source='folder.name', read_only=True)
+    folder_color = serializers.CharField(source='folder.color', read_only=True)
     
     class Meta:
         model = Webhook
@@ -31,6 +77,7 @@ class WebhookSerializer(serializers.ModelSerializer):
             'id', 'name', 'url', 'http_method', 'headers', 'payload',
             'schedule_type', 'cron_expression', 'scheduled_at', 'timezone',
             'is_active', 'max_retries', 'retry_delay', 'timeout',
+            'folder', 'folder_name', 'folder_color',
             'last_execution_at', 'execution_count', 'last_execution_status',
             'created_at', 'updated_at'
         ]
@@ -125,7 +172,7 @@ class WebhookCreateSerializer(WebhookSerializer):
         fields = [
             'name', 'url', 'http_method', 'headers', 'payload',
             'schedule_type', 'cron_expression', 'scheduled_at', 'timezone',
-            'max_retries', 'retry_delay', 'timeout'
+            'max_retries', 'retry_delay', 'timeout', 'folder'
         ]
 
 
@@ -133,14 +180,24 @@ class WebhookListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for listing webhooks."""
     
     execution_count = serializers.SerializerMethodField()
+    last_execution_status = serializers.SerializerMethodField()
+    folder_name = serializers.CharField(source='folder.name', read_only=True)
+    folder_color = serializers.CharField(source='folder.color', read_only=True)
     
     class Meta:
         model = Webhook
         fields = [
             'id', 'name', 'url', 'http_method', 'schedule_type',
-            'is_active', 'last_execution_at', 'execution_count', 'created_at'
+            'is_active', 'folder', 'folder_name', 'folder_color',
+            'last_execution_at', 'execution_count', 'last_execution_status',
+            'created_at'
         ]
         read_only_fields = fields
     
     def get_execution_count(self, obj):
         return obj.executions.count()
+    
+    def get_last_execution_status(self, obj):
+        """Get status of last execution."""
+        last_execution = obj.executions.first()
+        return last_execution.status if last_execution else None

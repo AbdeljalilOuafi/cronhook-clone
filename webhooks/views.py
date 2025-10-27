@@ -1,19 +1,86 @@
 """
 API views for webhook management.
 """
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import Webhook, WebhookExecution
+from .models import Webhook, WebhookExecution, WebhookFolder
 from .serializers import (
     WebhookSerializer,
     WebhookCreateSerializer,
     WebhookListSerializer,
-    WebhookExecutionSerializer
+    WebhookExecutionSerializer,
+    WebhookFolderSerializer
 )
 from .tasks import cancel_webhook_schedule
+
+
+class WebhookFolderViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for folder management.
+    
+    list: Get all folders for the authenticated user
+    create: Create a new folder
+    retrieve: Get details of a specific folder
+    update: Update a folder
+    partial_update: Partially update a folder
+    destroy: Delete a folder
+    move_webhooks: Move multiple webhooks to this folder
+    stats: Get statistics for a folder
+    """
+    
+    serializer_class = WebhookFolderSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name', 'description']
+    ordering_fields = ['name', 'created_at']
+    ordering = ['name']
+    
+    def get_queryset(self):
+        """Filter folders by authenticated user."""
+        return WebhookFolder.objects.filter(user=self.request.user).prefetch_related('subfolders')
+    
+    @action(detail=True, methods=['post'])
+    def move_webhooks(self, request, pk=None):
+        """Move multiple webhooks to this folder."""
+        folder = self.get_object()
+        webhook_ids = request.data.get('webhook_ids', [])
+        
+        if not webhook_ids:
+            return Response(
+                {'detail': 'webhook_ids is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        webhooks = Webhook.objects.filter(
+            id__in=webhook_ids,
+            user=request.user
+        )
+        
+        count = webhooks.update(folder=folder)
+        
+        return Response({
+            'detail': f'Moved {count} webhook(s) to "{folder.name}"',
+            'count': count
+        })
+    
+    @action(detail=True, methods=['get'])
+    def stats(self, request, pk=None):
+        """Get statistics for folder."""
+        folder = self.get_object()
+        webhooks = folder.webhooks.all()
+        
+        return Response({
+            'folder_name': folder.name,
+            'total_webhooks': webhooks.count(),
+            'active_webhooks': webhooks.filter(is_active=True).count(),
+            'inactive_webhooks': webhooks.filter(is_active=False).count(),
+            'total_executions': sum(w.execution_count for w in webhooks),
+            'one_time_webhooks': webhooks.filter(schedule_type='once').count(),
+            'recurring_webhooks': webhooks.filter(schedule_type='recurring').count(),
+        })
 
 
 class WebhookViewSet(viewsets.ModelViewSet):
@@ -31,8 +98,9 @@ class WebhookViewSet(viewsets.ModelViewSet):
     """
     
     permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['schedule_type', 'is_active', 'http_method']
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['folder', 'schedule_type', 'is_active', 'http_method']
+    search_fields = ['name', 'url']
     
     def get_queryset(self):
         """Filter webhooks by authenticated user."""
@@ -128,3 +196,42 @@ class WebhookViewSet(viewsets.ModelViewSet):
             {'detail': f'Webhook "{webhook.name}" has been activated'},
             status=status.HTTP_200_OK
         )
+    
+    @action(detail=False, methods=['post'])
+    def bulk_move(self, request):
+        """Move multiple webhooks to a folder (or remove from folder)."""
+        webhook_ids = request.data.get('webhook_ids', [])
+        folder_id = request.data.get('folder_id')  # None to remove from folder
+        
+        if not webhook_ids:
+            return Response(
+                {'detail': 'webhook_ids is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        folder = None
+        if folder_id:
+            try:
+                folder = WebhookFolder.objects.get(id=folder_id, user=request.user)
+            except WebhookFolder.DoesNotExist:
+                return Response(
+                    {'detail': 'Folder not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        
+        webhooks = Webhook.objects.filter(
+            id__in=webhook_ids,
+            user=request.user
+        )
+        
+        count = webhooks.update(folder=folder)
+        
+        if folder:
+            message = f'Moved {count} webhook(s) to "{folder.name}"'
+        else:
+            message = f'Removed {count} webhook(s) from folder'
+        
+        return Response({
+            'detail': message,
+            'count': count
+        })

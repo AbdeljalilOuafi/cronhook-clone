@@ -7,6 +7,57 @@ from django.core.validators import URLValidator
 from django.utils import timezone
 
 
+class WebhookFolder(models.Model):
+    """
+    Organize webhooks into folders for better management.
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='webhook_folders')
+    name = models.CharField(max_length=100, help_text="Folder name")
+    description = models.TextField(blank=True, help_text="Optional folder description")
+    color = models.CharField(max_length=7, default='#6366f1', help_text="Hex color code")
+    icon = models.CharField(max_length=50, blank=True, help_text="Icon name (lucide-react)")
+    parent = models.ForeignKey(
+        'self', 
+        on_delete=models.CASCADE, 
+        null=True, 
+        blank=True, 
+        related_name='subfolders',
+        help_text="Parent folder for nested organization"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['name']
+        unique_together = [['user', 'name', 'parent']]
+        indexes = [
+            models.Index(fields=['user', 'parent']),
+        ]
+    
+    def __str__(self):
+        return self.full_path
+    
+    @property
+    def webhook_count(self):
+        """Count webhooks in this folder (excluding subfolders)"""
+        return self.webhooks.count()
+    
+    @property
+    def total_webhook_count(self):
+        """Count webhooks in this folder and all subfolders"""
+        count = self.webhooks.count()
+        for subfolder in self.subfolders.all():
+            count += subfolder.total_webhook_count
+        return count
+    
+    @property
+    def full_path(self):
+        """Get full folder path: 'Parent / Child / Grandchild'"""
+        if self.parent:
+            return f"{self.parent.full_path} / {self.name}"
+        return self.name
+
+
 class Webhook(models.Model):
     """
     Represents a scheduled webhook that can be triggered once or repeatedly.
@@ -27,6 +78,16 @@ class Webhook(models.Model):
     
     # Ownership
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='webhooks')
+    
+    # Organization
+    folder = models.ForeignKey(
+        WebhookFolder,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='webhooks',
+        help_text="Optional folder for organization"
+    )
     
     # Basic info
     name = models.CharField(max_length=255, help_text="Descriptive name for the webhook")
@@ -87,6 +148,17 @@ class Webhook(models.Model):
     
     def __str__(self):
         return f"{self.name} ({self.get_schedule_type_display()})"
+    
+    @property
+    def execution_count(self):
+        """Count total executions for this webhook"""
+        return self.executions.count()
+    
+    @property
+    def last_execution_status(self):
+        """Get status of the most recent execution"""
+        last_exec = self.executions.first()
+        return last_exec.status if last_exec else None
     
     def clean(self):
         """Validate model constraints."""
