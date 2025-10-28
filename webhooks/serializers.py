@@ -42,7 +42,7 @@ class WebhookFolderSerializer(serializers.ModelSerializer):
         model = WebhookFolder
         fields = [
             'id', 'name', 'description', 'color', 'icon', 
-            'parent', 'webhook_count', 'total_webhook_count', 
+            'parent', 'account', 'webhook_count', 'total_webhook_count', 
             'full_path', 'subfolders', 'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
@@ -55,6 +55,7 @@ class WebhookFolderSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """Create folder and set user from request context."""
         validated_data['user'] = self.context['request'].user
+        # Keep the account field if provided in the data
         return super().create(validated_data)
     
     def validate(self, data):

@@ -19,6 +19,7 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   folder?: WebhookFolder; // If editing
+  selectedAccountId?: number | null;
 }
 
 const PRESET_COLORS = [
@@ -32,7 +33,7 @@ const PRESET_COLORS = [
   { name: 'Indigo', value: '#818cf8' },
 ];
 
-export function FolderDialog({ open, onOpenChange, folder }: Props) {
+export function FolderDialog({ open, onOpenChange, folder, selectedAccountId }: Props) {
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -40,8 +41,8 @@ export function FolderDialog({ open, onOpenChange, folder }: Props) {
   const [parentId, setParentId] = useState<number | null>(null);
 
   const { data: folders = [] } = useQuery({
-    queryKey: ['folders'],
-    queryFn: foldersApi.getAll,
+    queryKey: ['folders', selectedAccountId],
+    queryFn: () => foldersApi.getAll(selectedAccountId !== null ? { account: selectedAccountId } : undefined),
     enabled: open,
   });
 
@@ -85,6 +86,7 @@ export function FolderDialog({ open, onOpenChange, folder }: Props) {
       description: description || undefined,
       color,
       parent: parentId || undefined,
+      account: selectedAccountId || null,
     };
 
     if (folder) {

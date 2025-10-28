@@ -51,6 +51,7 @@ export interface CreateFolderRequest {
   color?: string;
   icon?: string;
   parent?: number | null;
+  account?: number | null;
 }
 
 export interface UpdateFolderRequest extends Partial<CreateFolderRequest> {}

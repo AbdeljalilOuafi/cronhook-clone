@@ -76,15 +76,16 @@ interface WebhookDialogProps {
   onClose: () => void;
   webhook: Webhook | null;
   defaultFolderId?: number | null;
+  selectedAccountId?: number | null;
 }
 
-export default function WebhookDialog({ open, onClose, webhook, defaultFolderId }: WebhookDialogProps) {
+export default function WebhookDialog({ open, onClose, webhook, defaultFolderId, selectedAccountId }: WebhookDialogProps) {
   const queryClient = useQueryClient();
   const isEditing = !!webhook;
 
   const { data: folders = [] } = useQuery({
-    queryKey: ['folders'],
-    queryFn: foldersApi.getAll,
+    queryKey: ['folders', selectedAccountId],
+    queryFn: () => foldersApi.getAll(selectedAccountId !== null ? { account: selectedAccountId } : undefined),
     enabled: open,
   });
 
@@ -248,6 +249,7 @@ export default function WebhookDialog({ open, onClose, webhook, defaultFolderId 
         retry_delay: data.retry_delay,
         timeout: data.timeout,
         folder: data.folder || null,
+        account: selectedAccountId || null,
       };
 
       // Only include the relevant schedule field based on schedule_type
