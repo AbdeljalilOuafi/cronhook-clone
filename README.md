@@ -1,4 +1,4 @@
-# CronHooks MVP
+# SyncHooks
 
 A webhook scheduling service that allows users to schedule webhooks to run one-time at specific dates/times or repeatedly using cron expressions.
 

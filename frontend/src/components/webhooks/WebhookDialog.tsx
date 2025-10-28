@@ -148,7 +148,7 @@ export default function WebhookDialog({ open, onClose, webhook, defaultFolderId,
     onSuccess: (data) => {
       console.log('✅ Webhook created successfully:', data);
       queryClient.invalidateQueries({ queryKey: ['webhooks'] });
-      toast.success('Webhook created successfully');
+      toast.success('SyncHook created successfully');
       onClose();
     },
     onError: (error: any) => {
@@ -157,7 +157,7 @@ export default function WebhookDialog({ open, onClose, webhook, defaultFolderId,
       const errorMessage = error.response?.data?.detail || 
                           error.response?.data?.message ||
                           error.message ||
-                          'Failed to create webhook';
+                          'Failed to create synchook';
       toast.error(errorMessage);
       
       // Show detailed errors if available
@@ -179,7 +179,7 @@ export default function WebhookDialog({ open, onClose, webhook, defaultFolderId,
     onSuccess: (data) => {
       console.log('✅ Webhook updated successfully:', data);
       queryClient.invalidateQueries({ queryKey: ['webhooks'] });
-      toast.success('Webhook updated successfully');
+      toast.success('SyncHook updated successfully');
       onClose();
     },
     onError: (error: any) => {
@@ -191,7 +191,7 @@ export default function WebhookDialog({ open, onClose, webhook, defaultFolderId,
       const errorMessage = error.response?.data?.detail || 
                           error.response?.data?.message ||
                           error.message ||
-                          'Failed to update webhook';
+                          'Failed to update synchook';
       toast.error(errorMessage);
       
       // Show detailed errors if available
@@ -283,10 +283,10 @@ export default function WebhookDialog({ open, onClose, webhook, defaultFolderId,
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'Edit Webhook' : 'Create Webhook'}</DialogTitle>
+          <DialogTitle>{isEditing ? 'Edit SyncHook' : 'Create SyncHook'}</DialogTitle>
           <DialogDescription>
             {isEditing
-              ? 'Update webhook configuration'
+              ? 'Update synchook configuration'
               : 'Configure a new scheduled HTTP request'}
           </DialogDescription>
         </DialogHeader>
@@ -316,7 +316,7 @@ export default function WebhookDialog({ open, onClose, webhook, defaultFolderId,
                 <Label htmlFor="name">Name *</Label>
                 <Input
                   id="name"
-                  placeholder="My Webhook"
+                  placeholder="My SyncHook"
                   {...register('name')}
                   className={errors.name ? 'border-destructive' : ''}
                 />

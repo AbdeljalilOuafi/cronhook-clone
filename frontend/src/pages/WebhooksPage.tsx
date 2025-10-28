@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { webhooksApi } from '@/api/webhooks';
 import type { Webhook } from '@/types';
 import { formatUTCForDisplay } from '@/lib/timezone-utils';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
@@ -24,7 +25,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, Clock, MoreVertical, FolderInput } from 'lucide-react';
+import { Plus, Trash2, Clock, MoreVertical, FolderInput, Search, X, Loader2 } from 'lucide-react';
 import WebhookDialog from '@/components/webhooks/WebhookDialog';
 import { FolderSidebar } from '@/components/folders/FolderSidebar';
 import { FolderBadge } from '@/components/folders/FolderBadge';
@@ -43,14 +44,26 @@ export default function WebhooksPage() {
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
   const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [webhookToMove, setWebhookToMove] = useState<Webhook | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
   const queryClient = useQueryClient();
 
-  const { data: webhooks, isLoading } = useQuery({
-    queryKey: ['webhooks', selectedFolderId, selectedAccountId],
+  // Debounce search query to avoid too many API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500); // 500ms delay
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const { data: webhooks, isLoading, isFetching } = useQuery({
+    queryKey: ['webhooks', selectedFolderId, selectedAccountId, debouncedSearchQuery],
     queryFn: () => {
       const filters: any = {};
       if (selectedFolderId !== null) filters.folder = selectedFolderId;
       if (selectedAccountId !== null) filters.account = selectedAccountId;
+      if (debouncedSearchQuery.trim()) filters.search = debouncedSearchQuery.trim();
       return webhooksApi.getAll(Object.keys(filters).length > 0 ? filters : undefined);
     },
   });
@@ -59,10 +72,10 @@ export default function WebhooksPage() {
     mutationFn: webhooksApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhooks'] });
-      toast.success('Webhook deleted successfully');
+      toast.success('SyncHook deleted successfully');
     },
     onError: () => {
-      toast.error('Failed to delete webhook');
+      toast.error('Failed to delete synchook');
     },
   });
 
@@ -71,14 +84,14 @@ export default function WebhooksPage() {
       is_active ? webhooksApi.cancel(id) : webhooksApi.activate(id),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['webhooks'] });
-      const message = data?.detail || 'Webhook status updated';
+      const message = data?.detail || 'SyncHook status updated';
       toast.success(message);
     },
     onError: (error: any, variables) => {
       const errorMessage = error.response?.data?.detail || 
                           error.response?.data?.message ||
                           error.message ||
-                          'Failed to update webhook status';
+                          'Failed to update synchook status';
       
       // Check if error is due to past scheduled time
       if (errorMessage.includes('scheduled time is in the past')) {
@@ -153,10 +166,11 @@ export default function WebhooksPage() {
     }
   };
 
-  if (isLoading) {
+  // Only show full-page loader on initial load, not during search
+  if (isLoading && !debouncedSearchQuery && !searchQuery) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">Loading webhooks...</p>
+        <p className="text-muted-foreground">Loading synchooks...</p>
       </div>
     );
   }
@@ -172,7 +186,7 @@ export default function WebhooksPage() {
       <div className="flex-1 p-6 space-y-6 overflow-y-auto">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-3xl font-bold">Webhooks</h2>
+            <h2 className="text-3xl font-bold">SyncHooks</h2>
             <p className="text-muted-foreground">
               Manage your scheduled HTTP requests
             </p>
@@ -184,18 +198,67 @@ export default function WebhooksPage() {
             />
             <Button onClick={handleCreate} className="flex items-center space-x-2">
               <Plus className="h-4 w-4" />
-              <span>New Webhook</span>
+              <span>New SyncHook</span>
             </Button>
           </div>
+        </div>
+
+        {/* Search Bar */}
+        <div className="flex items-center gap-4">
+          <div className="relative max-w-sm">
+            {isFetching ? (
+              <Loader2 className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4 animate-spin" />
+            ) : (
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            )}
+            <Input
+              placeholder="Search synchooks by name or URL..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 pr-10"
+            />
+            {searchQuery && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
+                onClick={() => setSearchQuery('')}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
+          {searchQuery && webhooks && (
+            <p className="text-sm text-muted-foreground">
+              Found {webhooks.length} synchook{webhooks.length !== 1 ? 's' : ''} matching "{searchQuery}"
+            </p>
+          )}
         </div>
 
       {webhooks && webhooks.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <p className="text-muted-foreground mb-4">No webhooks yet</p>
-            <Button onClick={handleCreate} variant="outline">
-              Create your first webhook
-            </Button>
+            {searchQuery ? (
+              <div className="text-center">
+                <p className="text-muted-foreground mb-2">No synchooks found matching "{searchQuery}"</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Try adjusting your search or search in a different account
+                </p>
+                <Button 
+                  onClick={() => setSearchQuery('')} 
+                  variant="outline"
+                >
+                  Clear search
+                </Button>
+              </div>
+            ) : (
+              <div className="text-center">
+                <p className="text-muted-foreground mb-4">No synchooks yet</p>
+                <Button onClick={handleCreate} variant="outline">
+                  Create your first synchook
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -217,6 +280,18 @@ export default function WebhooksPage() {
                           name={webhook.folder_name} 
                           color={webhook.folder_color}
                         />
+                        {searchQuery && (
+                          <span className="text-xs text-muted-foreground ml-2">
+                            in {webhook.folder_name}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {searchQuery && !webhook.folder_name && (
+                      <div className="mt-2">
+                        <span className="text-xs text-muted-foreground">
+                          No folder
+                        </span>
                       </div>
                     )}
                     <CardDescription className="mt-1">
@@ -324,10 +399,10 @@ export default function WebhooksPage() {
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
               <p>
-                The webhook <strong>"{pastTimeWebhook?.name}"</strong> cannot be activated because its scheduled time is in the past.
+                The synchook <strong>"{pastTimeWebhook?.name}"</strong> cannot be activated because its scheduled time is in the past.
               </p>
               <p className="text-sm">
-                Would you like to update the scheduled time to activate this webhook?
+                Would you like to update the scheduled time to activate this synchook?
               </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -336,7 +411,7 @@ export default function WebhooksPage() {
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction onClick={handleUpdateFromAlert}>
-              Update Webhook
+              Update SyncHook
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -348,7 +423,7 @@ export default function WebhooksPage() {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <Trash2 className="h-5 w-5 text-red-500" />
-              Delete Webhook
+              Delete SyncHook
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
               <p>

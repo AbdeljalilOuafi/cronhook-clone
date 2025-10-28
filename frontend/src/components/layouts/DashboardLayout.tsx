@@ -1,7 +1,7 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth';
 import { Button } from '@/components/ui/button';
-import { Clock, Webhook, History, LogOut } from 'lucide-react';
+import { Webhook, History, LogOut } from 'lucide-react';
 
 export default function DashboardLayout() {
   const navigate = useNavigate();
@@ -14,7 +14,7 @@ export default function DashboardLayout() {
   };
 
   const navItems = [
-    { path: '/webhooks', label: 'Webhooks', icon: Webhook },
+    { path: '/webhooks', label: 'SyncHooks', icon: Webhook },
     { path: '/executions', label: 'Executions', icon: History },
   ];
 
@@ -25,10 +25,11 @@ export default function DashboardLayout() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <div className="p-2 bg-primary rounded-lg">
-                <Clock className="h-6 w-6 text-primary-foreground" />
-              </div>
-              <h1 className="text-2xl font-bold">CronHooks</h1>
+              <img 
+                src="/onsync ai blue icon.png" 
+                alt="SyncHooks" 
+                className="h-12 w-auto"
+              />
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-sm text-muted-foreground">

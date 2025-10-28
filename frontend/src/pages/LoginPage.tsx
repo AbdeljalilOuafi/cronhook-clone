@@ -58,7 +58,7 @@ export default function LoginPage() {
               <Clock className="h-8 w-8 text-primary-foreground" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">CronHooks</CardTitle>
+          <CardTitle className="text-2xl font-bold">SyncHooks</CardTitle>
           <CardDescription>
             Sign in to manage your scheduled webhooks
           </CardDescription>

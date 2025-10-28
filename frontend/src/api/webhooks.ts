@@ -8,7 +8,7 @@ import type {
 } from '@/types';
 
 export const webhooksApi = {
-  getAll: async (params?: { folder?: number | null }): Promise<Webhook[]> => {
+  getAll: async (params?: { folder?: number | null; account?: number | null; search?: string }): Promise<Webhook[]> => {
     const response = await apiClient.get<PaginatedResponse<Webhook>>('/webhooks/', { params });
     return response.data.results;
   },
