@@ -23,7 +23,7 @@ SECRET_KEY = env('SECRET_KEY', default='django-insecure-dev-key-change-in-produc
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env('DEBUG')
 
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['schedules.onsync.ai'])
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost'])
 
 # Application definition
 
@@ -58,8 +58,10 @@ MIDDLEWARE = [
 ]
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # Vite dev server
-    "http://127.0.0.1:5173",
+    "http://localhost:5174",  # Vite dev server
+    "http://127.0.0.1:5174",
+    "http://localhost:5173",  # Another common port for Vite
+    "http://127.0.0.1:5173"
 ]
 
 CORS_ALLOW_CREDENTIALS = True

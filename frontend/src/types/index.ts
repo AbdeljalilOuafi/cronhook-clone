@@ -2,6 +2,21 @@ export interface User {
   id: number;
   username: string;
   email: string;
+  is_superuser?: boolean;
+}
+
+export interface Account {
+  id: number;
+  name: string;
+  email?: string;
+  ceo_name?: string;
+  niche?: string;
+  location?: string;
+  domain_name_main?: string;
+  website_url?: string;
+  date_joined?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface LoginRequest {
@@ -25,6 +40,7 @@ export interface WebhookFolder {
   total_webhook_count: number;
   full_path: string;
   subfolders: WebhookFolder[];
+  account?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -57,6 +73,8 @@ export interface Webhook {
   folder?: number | null;
   folder_name?: string;
   folder_color?: string;
+  account?: number | null;
+  account_name?: string;
   last_execution_at?: string | null;
   execution_count: number;
   last_execution_status?: 'success' | 'failed' | 'pending' | 'retrying' | null;
@@ -92,6 +110,7 @@ export interface CreateWebhookRequest {
   retry_delay?: number;
   timeout?: number;
   folder?: number | null;
+  account?: number | null;
 }
 
 export interface UpdateWebhookRequest extends Partial<CreateWebhookRequest> {

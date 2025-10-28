@@ -2,19 +2,72 @@
 API views for webhook management.
 """
 from rest_framework import viewsets, status, filters
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
+from rest_framework.authtoken.models import Token
+from django.contrib.auth import authenticate
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import Webhook, WebhookExecution, WebhookFolder
+from .models import Webhook, WebhookExecution, WebhookFolder, Account
 from .serializers import (
     WebhookSerializer,
     WebhookCreateSerializer,
     WebhookListSerializer,
     WebhookExecutionSerializer,
-    WebhookFolderSerializer
+    WebhookFolderSerializer,
+    AccountSerializer,
+    UserSerializer
 )
 from .tasks import cancel_webhook_schedule
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def custom_login(request):
+    """
+    Custom login view that returns user details including is_superuser.
+    """
+    username = request.data.get('username')
+    password = request.data.get('password')
+    
+    if not username or not password:
+        return Response(
+            {'detail': 'Username and password are required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    user = authenticate(username=username, password=password)
+    
+    if user is None:
+        return Response(
+            {'detail': 'Invalid credentials'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+    
+    token, created = Token.objects.get_or_create(user=user)
+    user_serializer = UserSerializer(user)
+    
+    return Response({
+        'token': token.key,
+        'user': user_serializer.data
+    })
+
+
+class AccountViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for account management (superuser only).
+    
+    list: Get all accounts
+    retrieve: Get details of a specific account
+    """
+    
+    queryset = Account.objects.all().order_by('name')
+    serializer_class = AccountSerializer
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name', 'email', 'ceo_name']
+    ordering_fields = ['name', 'created_at']
+    ordering = ['name']
 
 
 class WebhookFolderViewSet(viewsets.ModelViewSet):
@@ -39,8 +92,15 @@ class WebhookFolderViewSet(viewsets.ModelViewSet):
     ordering = ['name']
     
     def get_queryset(self):
-        """Filter folders by authenticated user."""
-        return WebhookFolder.objects.filter(user=self.request.user).prefetch_related('subfolders')
+        """Filter folders by authenticated user and optionally by account."""
+        queryset = WebhookFolder.objects.filter(user=self.request.user).prefetch_related('subfolders')
+        
+        # Filter by account if provided in query params (for superuser viewing specific account)
+        account_id = self.request.query_params.get('account')
+        if account_id:
+            queryset = queryset.filter(account_id=account_id)
+        
+        return queryset
     
     @action(detail=True, methods=['post'])
     def move_webhooks(self, request, pk=None):
@@ -99,12 +159,19 @@ class WebhookViewSet(viewsets.ModelViewSet):
     
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
-    filterset_fields = ['folder', 'schedule_type', 'is_active', 'http_method']
+    filterset_fields = ['folder', 'schedule_type', 'is_active', 'http_method', 'account']
     search_fields = ['name', 'url']
     
     def get_queryset(self):
-        """Filter webhooks by authenticated user."""
-        return Webhook.objects.filter(user=self.request.user).prefetch_related('executions')
+        """Filter webhooks by authenticated user and optionally by account."""
+        queryset = Webhook.objects.filter(user=self.request.user).prefetch_related('executions')
+        
+        # Filter by account if provided in query params (for superuser viewing specific account)
+        account_id = self.request.query_params.get('account')
+        if account_id:
+            queryset = queryset.filter(account_id=account_id)
+        
+        return queryset
     
     def get_serializer_class(self):
         """Return appropriate serializer based on action."""

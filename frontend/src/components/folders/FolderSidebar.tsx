@@ -10,15 +10,16 @@ import { FolderDialog } from './FolderDialog';
 interface Props {
   selectedFolderId: number | null;
   onSelectFolder: (folderId: number | null) => void;
+  selectedAccountId?: number | null;
 }
 
-export function FolderSidebar({ selectedFolderId, onSelectFolder }: Props) {
+export function FolderSidebar({ selectedFolderId, onSelectFolder, selectedAccountId }: Props) {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState<Set<number>>(new Set());
 
   const { data: folders = [], isLoading } = useQuery({
-    queryKey: ['folders'],
-    queryFn: foldersApi.getAll,
+    queryKey: ['folders', selectedAccountId],
+    queryFn: () => foldersApi.getAll(selectedAccountId !== null ? { account: selectedAccountId } : undefined),
   });
 
   const toggleFolder = (folderId: number) => {

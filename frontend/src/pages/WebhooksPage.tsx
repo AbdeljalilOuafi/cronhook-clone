@@ -29,6 +29,7 @@ import WebhookDialog from '@/components/webhooks/WebhookDialog';
 import { FolderSidebar } from '@/components/folders/FolderSidebar';
 import { FolderBadge } from '@/components/folders/FolderBadge';
 import { MoveWebhookDialog } from '@/components/webhooks/MoveWebhookDialog';
+import { AccountSelector } from '@/components/accounts/AccountSelector';
 
 export default function WebhooksPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -39,13 +40,19 @@ export default function WebhooksPage() {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [webhookToDelete, setWebhookToDelete] = useState<Webhook | null>(null);
   const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
+  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
   const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [webhookToMove, setWebhookToMove] = useState<Webhook | null>(null);
   const queryClient = useQueryClient();
 
   const { data: webhooks, isLoading } = useQuery({
-    queryKey: ['webhooks', selectedFolderId],
-    queryFn: () => webhooksApi.getAll(selectedFolderId !== null ? { folder: selectedFolderId } : undefined),
+    queryKey: ['webhooks', selectedFolderId, selectedAccountId],
+    queryFn: () => {
+      const filters: any = {};
+      if (selectedFolderId !== null) filters.folder = selectedFolderId;
+      if (selectedAccountId !== null) filters.account = selectedAccountId;
+      return webhooksApi.getAll(Object.keys(filters).length > 0 ? filters : undefined);
+    },
   });
 
   const deleteMutation = useMutation({
@@ -159,6 +166,7 @@ export default function WebhooksPage() {
       <FolderSidebar
         selectedFolderId={selectedFolderId}
         onSelectFolder={setSelectedFolderId}
+        selectedAccountId={selectedAccountId}
       />
       
       <div className="flex-1 p-6 space-y-6 overflow-y-auto">
@@ -169,10 +177,16 @@ export default function WebhooksPage() {
               Manage your scheduled HTTP requests
             </p>
           </div>
-          <Button onClick={handleCreate} className="flex items-center space-x-2">
-            <Plus className="h-4 w-4" />
-            <span>New Webhook</span>
-          </Button>
+          <div className="flex items-center gap-4">
+            <AccountSelector 
+              selectedAccountId={selectedAccountId}
+              onAccountChange={setSelectedAccountId}
+            />
+            <Button onClick={handleCreate} className="flex items-center space-x-2">
+              <Plus className="h-4 w-4" />
+              <span>New Webhook</span>
+            </Button>
+          </div>
         </div>
 
       {webhooks && webhooks.length === 0 ? (

@@ -2,9 +2,32 @@
 Serializers for webhook API endpoints.
 """
 from rest_framework import serializers
+from django.contrib.auth.models import User
 from django.utils import timezone
 from croniter import croniter
-from .models import Webhook, WebhookExecution, WebhookFolder
+from .models import Webhook, WebhookExecution, WebhookFolder, Account
+
+
+class UserSerializer(serializers.ModelSerializer):
+    """Serializer for User model."""
+    
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'is_superuser']
+        read_only_fields = ['id', 'username', 'email', 'is_superuser']
+
+
+class AccountSerializer(serializers.ModelSerializer):
+    """Serializer for Account model."""
+    
+    class Meta:
+        model = Account
+        fields = [
+            'id', 'name', 'email', 'ceo_name', 'niche', 'location',
+            'domain_name_main', 'website_url', 'date_joined',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
 
 
 class WebhookFolderSerializer(serializers.ModelSerializer):
@@ -70,6 +93,7 @@ class WebhookSerializer(serializers.ModelSerializer):
     last_execution_status = serializers.SerializerMethodField()
     folder_name = serializers.CharField(source='folder.name', read_only=True)
     folder_color = serializers.CharField(source='folder.color', read_only=True)
+    account_name = serializers.CharField(source='account.name', read_only=True)
     
     class Meta:
         model = Webhook
@@ -78,6 +102,7 @@ class WebhookSerializer(serializers.ModelSerializer):
             'schedule_type', 'cron_expression', 'scheduled_at', 'timezone',
             'is_active', 'max_retries', 'retry_delay', 'timeout',
             'folder', 'folder_name', 'folder_color',
+            'account', 'account_name',
             'last_execution_at', 'execution_count', 'last_execution_status',
             'created_at', 'updated_at'
         ]
@@ -140,6 +165,13 @@ class WebhookSerializer(serializers.ModelSerializer):
         # Set user from request context
         validated_data['user'] = self.context['request'].user
         
+        # If account is provided, use it; otherwise check if user is acting on behalf of an account
+        # (stored in request session/context for superusers)
+        if 'account' not in validated_data:
+            request = self.context.get('request')
+            if request and hasattr(request, 'selected_account_id'):
+                validated_data['account_id'] = request.selected_account_id
+        
         webhook = super().create(validated_data)
         
         # Schedule the webhook
@@ -172,7 +204,7 @@ class WebhookCreateSerializer(WebhookSerializer):
         fields = [
             'name', 'url', 'http_method', 'headers', 'payload',
             'schedule_type', 'cron_expression', 'scheduled_at', 'timezone',
-            'max_retries', 'retry_delay', 'timeout', 'folder'
+            'max_retries', 'retry_delay', 'timeout', 'folder', 'account'
         ]
 
 
@@ -183,12 +215,14 @@ class WebhookListSerializer(serializers.ModelSerializer):
     last_execution_status = serializers.SerializerMethodField()
     folder_name = serializers.CharField(source='folder.name', read_only=True)
     folder_color = serializers.CharField(source='folder.color', read_only=True)
+    account_name = serializers.CharField(source='account.name', read_only=True)
     
     class Meta:
         model = Webhook
         fields = [
             'id', 'name', 'url', 'http_method', 'schedule_type',
             'is_active', 'folder', 'folder_name', 'folder_color',
+            'account', 'account_name',
             'last_execution_at', 'execution_count', 'last_execution_status',
             'created_at'
         ]

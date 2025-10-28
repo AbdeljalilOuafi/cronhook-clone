@@ -9,8 +9,14 @@ interface PaginatedResponse<T> {
 }
 
 export const foldersApi = {
-  getAll: async (): Promise<WebhookFolder[]> => {
-    const response = await apiClient.get<PaginatedResponse<WebhookFolder>>('/folders/');
+  getAll: async (filters?: { account?: number }): Promise<WebhookFolder[]> => {
+    const params = new URLSearchParams();
+    if (filters?.account !== undefined) {
+      params.append('account', filters.account.toString());
+    }
+    const queryString = params.toString();
+    const url = queryString ? `/folders/?${queryString}` : '/folders/';
+    const response = await apiClient.get<PaginatedResponse<WebhookFolder>>(url);
     return response.data.results;
   },
 

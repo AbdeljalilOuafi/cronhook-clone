@@ -7,11 +7,49 @@ from django.core.validators import URLValidator
 from django.utils import timezone
 
 
+class Account(models.Model):
+    """
+    Represents a client/company account for multi-tenancy support.
+    Maps to the existing 'accounts' table in the database.
+    """
+    name = models.CharField(max_length=255)
+    email = models.EmailField(max_length=255, unique=True, null=True, blank=True)
+    ceo_name = models.CharField(max_length=255, null=True, blank=True)
+    niche = models.CharField(max_length=255, null=True, blank=True)
+    location = models.TextField(null=True, blank=True)
+    stripe_api_key = models.TextField(null=True, blank=True)
+    trz_api_key = models.TextField(null=True, blank=True)  # Fixed field name
+    slack_workspace_url = models.CharField(max_length=255, null=True, blank=True)
+    slack_app_token = models.CharField(max_length=255, null=True, blank=True)  # Fixed field name
+    domain_name_main = models.CharField(max_length=255, null=True, blank=True)
+    website_url = models.CharField(max_length=255, null=True, blank=True)
+    date_joined = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    trz_group_id = models.IntegerField(null=True, blank=True, unique=True)
+    trz_admin_user_id = models.IntegerField(null=True, blank=True, unique=True)
+
+    class Meta:
+        db_table = 'accounts'  # Use existing table
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
 class WebhookFolder(models.Model):
     """
     Organize webhooks into folders for better management.
     """
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='webhook_folders')
+    account = models.ForeignKey(
+        Account,
+        on_delete=models.CASCADE,
+        related_name='webhook_folders',
+        null=True,
+        blank=True,
+        help_text="Account this folder belongs to (for multi-tenancy)"
+    )
     name = models.CharField(max_length=100, help_text="Folder name")
     description = models.TextField(blank=True, help_text="Optional folder description")
     color = models.CharField(max_length=7, default='#6366f1', help_text="Hex color code")
@@ -78,6 +116,14 @@ class Webhook(models.Model):
     
     # Ownership
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='webhooks')
+    account = models.ForeignKey(
+        'Account',
+        on_delete=models.CASCADE,
+        related_name='webhooks',
+        null=True,
+        blank=True,
+        help_text="Account this webhook belongs to (for multi-tenancy)"
+    )
     
     # Organization
     folder = models.ForeignKey(
