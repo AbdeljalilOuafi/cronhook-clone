@@ -25,7 +25,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, Clock, MoreVertical, FolderInput, Search, X, Loader2 } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Plus, Trash2, Clock, MoreVertical, FolderInput, Search, X, Loader2, ArrowUpDown } from 'lucide-react';
 import WebhookDialog from '@/components/webhooks/WebhookDialog';
 import { FolderSidebar } from '@/components/folders/FolderSidebar';
 import { FolderBadge } from '@/components/folders/FolderBadge';
@@ -46,6 +53,7 @@ export default function WebhooksPage() {
   const [webhookToMove, setWebhookToMove] = useState<Webhook | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
+  const [sortBy, setSortBy] = useState<string>('created_desc');
   const queryClient = useQueryClient();
 
   // Debounce search query to avoid too many API calls
@@ -67,6 +75,31 @@ export default function WebhooksPage() {
       return webhooksApi.getAll(Object.keys(filters).length > 0 ? filters : undefined);
     },
   });
+
+  // Sort webhooks based on selected sort option
+  const sortedWebhooks = webhooks ? [...webhooks].sort((a, b) => {
+    switch (sortBy) {
+      case 'created_desc':
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      case 'created_asc':
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      case 'schedule_asc':
+        // For scheduled_at, handle null values and put them at the end
+        const aSchedule = a.scheduled_at ? new Date(a.scheduled_at).getTime() : Infinity;
+        const bSchedule = b.scheduled_at ? new Date(b.scheduled_at).getTime() : Infinity;
+        return aSchedule - bSchedule;
+      case 'schedule_desc':
+        const aScheduleDesc = a.scheduled_at ? new Date(a.scheduled_at).getTime() : -Infinity;
+        const bScheduleDesc = b.scheduled_at ? new Date(b.scheduled_at).getTime() : -Infinity;
+        return bScheduleDesc - aScheduleDesc;
+      case 'name_asc':
+        return a.name.localeCompare(b.name);
+      case 'name_desc':
+        return b.name.localeCompare(a.name);
+      default:
+        return 0;
+    }
+  }) : [];
 
   const deleteMutation = useMutation({
     mutationFn: webhooksApi.delete,
@@ -96,7 +129,7 @@ export default function WebhooksPage() {
       // Check if error is due to past scheduled time
       if (errorMessage.includes('scheduled time is in the past')) {
         // Find the webhook that failed
-        const failedWebhook = webhooks?.find(w => w.id === variables.id);
+        const failedWebhook = sortedWebhooks?.find(w => w.id === variables.id);
         if (failedWebhook) {
           setPastTimeWebhook(failedWebhook);
           setShowPastTimeAlert(true);
@@ -203,7 +236,7 @@ export default function WebhooksPage() {
           </div>
         </div>
 
-        {/* Search Bar */}
+        {/* Search Bar and Sort */}
         <div className="flex items-center gap-4">
           <div className="relative max-w-sm">
             {isFetching ? (
@@ -228,14 +261,33 @@ export default function WebhooksPage() {
               </Button>
             )}
           </div>
-          {searchQuery && webhooks && (
+          
+          {/* Sort Dropdown */}
+          <div className="flex items-center gap-2">
+            <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Sort by..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="created_desc">Newest First</SelectItem>
+                <SelectItem value="created_asc">Oldest First</SelectItem>
+                <SelectItem value="schedule_asc">Schedule: Soonest</SelectItem>
+                <SelectItem value="schedule_desc">Schedule: Latest</SelectItem>
+                <SelectItem value="name_asc">Name: A to Z</SelectItem>
+                <SelectItem value="name_desc">Name: Z to A</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {searchQuery && sortedWebhooks && (
             <p className="text-sm text-muted-foreground">
-              Found {webhooks.length} synchook{webhooks.length !== 1 ? 's' : ''} matching "{searchQuery}"
+              Found {sortedWebhooks.length} synchook{sortedWebhooks.length !== 1 ? 's' : ''} matching "{searchQuery}"
             </p>
           )}
         </div>
 
-      {webhooks && webhooks.length === 0 ? (
+      {sortedWebhooks && sortedWebhooks.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             {searchQuery ? (
@@ -263,7 +315,7 @@ export default function WebhooksPage() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {webhooks?.map((webhook) => (
+          {sortedWebhooks?.map((webhook) => (
             <Card 
               key={webhook.id}
               className={`transition-all hover:shadow-lg hover:border-primary/50 ${
