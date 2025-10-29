@@ -123,8 +123,10 @@ def execute_webhook(self, webhook_id, attempt_number=1):
 def schedule_webhook(webhook_id):
     """
     Schedule a webhook based on its type (one-time or recurring).
+    Handles timezone conversion for one-time webhooks and uses timezone for recurring webhooks.
     """
     from .models import Webhook
+    import pytz
     
     try:
         webhook = Webhook.objects.get(id=webhook_id)
@@ -133,21 +135,54 @@ def schedule_webhook(webhook_id):
         return
     
     if webhook.schedule_type == 'once':
-        # Schedule one-time task
-        eta = webhook.scheduled_at
-        if eta and eta > timezone.now():
+        # Schedule one-time task with timezone handling
+        if not webhook.scheduled_at:
+            logger.error(f"One-time webhook {webhook.name} has no scheduled_at time")
+            return
+        
+        scheduled_time = webhook.scheduled_at
+        
+        # Convert to UTC if timezone is specified and different from UTC
+        if webhook.timezone and webhook.timezone != 'UTC':
+            try:
+                user_tz = pytz.timezone(webhook.timezone)
+                
+                # If scheduled_at is naive (no timezone info), localize it to user's timezone
+                if scheduled_time.tzinfo is None:
+                    scheduled_time = user_tz.localize(scheduled_time)
+                    logger.info(f"Localized naive datetime to {webhook.timezone}")
+                else:
+                    # If already timezone-aware, convert from current tz to user's timezone
+                    # This handles the case where frontend sends UTC and we need to interpret it as user's timezone
+                    scheduled_time = scheduled_time.replace(tzinfo=None)
+                    scheduled_time = user_tz.localize(scheduled_time)
+                
+                # Convert to UTC for Celery scheduling
+                scheduled_time_utc = scheduled_time.astimezone(pytz.UTC)
+                logger.info(f"Converted {webhook.timezone} time {scheduled_time} to UTC {scheduled_time_utc}")
+                scheduled_time = scheduled_time_utc
+            except Exception as e:
+                logger.error(f"Error converting timezone for webhook {webhook.name}: {str(e)}")
+                # Fall back to using scheduled_at as-is
+        else:
+            # Ensure it's UTC-aware if no timezone specified
+            if scheduled_time.tzinfo is None:
+                scheduled_time = pytz.UTC.localize(scheduled_time)
+        
+        # Check if scheduled time is in the future
+        if scheduled_time > timezone.now():
             result = execute_webhook.apply_async(
                 args=[webhook_id],
-                eta=eta
+                eta=scheduled_time
             )
             
             # Store task ID for cancellation
             webhook.celery_task_id = result.id
             webhook.save(update_fields=['celery_task_id'])
             
-            logger.info(f"Scheduled one-time webhook {webhook.name} for {eta}")
+            logger.info(f"Scheduled one-time webhook {webhook.name} for {scheduled_time} UTC (user timezone: {webhook.timezone})")
         else:
-            logger.warning(f"Cannot schedule webhook {webhook.name}: scheduled time is in the past")
+            logger.warning(f"Cannot schedule webhook {webhook.name}: scheduled time {scheduled_time} is in the past")
     
     elif webhook.schedule_type == 'recurring':
         # Parse cron expression

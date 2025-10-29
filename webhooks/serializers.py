@@ -127,6 +127,16 @@ class WebhookSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(f"Invalid cron expression: {str(e)}")
         return value
     
+    def validate_timezone(self, value):
+        """Validate timezone string."""
+        if value:
+            import pytz
+            try:
+                pytz.timezone(value)
+            except pytz.exceptions.UnknownTimeZoneError:
+                raise serializers.ValidationError(f"Invalid timezone: {value}")
+        return value
+    
     def validate_scheduled_at(self, value):
         """Validate scheduled datetime is in the future."""
         if value and value <= timezone.now():

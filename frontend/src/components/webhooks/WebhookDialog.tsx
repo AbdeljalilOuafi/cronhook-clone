@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
@@ -82,6 +82,16 @@ interface WebhookDialogProps {
 export default function WebhookDialog({ open, onClose, webhook, defaultFolderId, selectedAccountId }: WebhookDialogProps) {
   const queryClient = useQueryClient();
   const isEditing = !!webhook;
+
+  // Get all available IANA timezones using built-in browser API
+  const timezones = useMemo(() => {
+    try {
+      return Intl.supportedValuesOf('timeZone');
+    } catch (e) {
+      // Fallback for older browsers
+      return ['UTC', 'America/New_York', 'Europe/London', 'Asia/Tokyo'];
+    }
+  }, []);
 
   const { data: folders = [] } = useQuery({
     queryKey: ['folders', selectedAccountId],
@@ -426,6 +436,28 @@ export default function WebhookDialog({ open, onClose, webhook, defaultFolderId,
                     </p>
                   )}
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="timezone">Timezone</Label>
+                  <Select
+                    value={watch('timezone') || 'UTC'}
+                    onValueChange={(value) => setValue('timezone', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select timezone" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[300px]">
+                      {timezones.map((tz) => (
+                        <SelectItem key={tz} value={tz}>
+                          {tz}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Timezone for scheduling (defaults to UTC)
+                  </p>
+                </div>
               </TabsContent>
 
               <TabsContent value="recurring" className="space-y-4">
@@ -448,12 +480,25 @@ export default function WebhookDialog({ open, onClose, webhook, defaultFolderId,
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="timezone">Timezone</Label>
-                  <Input
-                    id="timezone"
-                    placeholder="UTC"
-                    {...register('timezone')}
-                  />
+                  <Label htmlFor="timezone-recurring">Timezone</Label>
+                  <Select
+                    value={watch('timezone') || 'UTC'}
+                    onValueChange={(value) => setValue('timezone', value)}
+                  >
+                    <SelectTrigger id="timezone-recurring">
+                      <SelectValue placeholder="Select timezone" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[300px]">
+                      {timezones.map((tz) => (
+                        <SelectItem key={tz} value={tz}>
+                          {tz}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Timezone for cron schedule (e.g., "0 9 * * *" in America/New_York runs at 9 AM EST/EDT)
+                  </p>
                 </div>
               </TabsContent>
             </Tabs>
