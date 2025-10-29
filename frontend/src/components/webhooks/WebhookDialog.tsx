@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Folder } from 'lucide-react';
+import { Folder, Search } from 'lucide-react';
 
 const webhookSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -82,9 +82,10 @@ interface WebhookDialogProps {
 export default function WebhookDialog({ open, onClose, webhook, defaultFolderId, selectedAccountId }: WebhookDialogProps) {
   const queryClient = useQueryClient();
   const isEditing = !!webhook;
+  const [timezoneSearch, setTimezoneSearch] = useState('');
 
   // Get all available IANA timezones using built-in browser API
-  const timezones = useMemo(() => {
+  const allTimezones = useMemo(() => {
     try {
       return Intl.supportedValuesOf('timeZone');
     } catch (e) {
@@ -92,6 +93,16 @@ export default function WebhookDialog({ open, onClose, webhook, defaultFolderId,
       return ['UTC', 'America/New_York', 'Europe/London', 'Asia/Tokyo'];
     }
   }, []);
+
+  // Filter timezones based on search query
+  const filteredTimezones = useMemo(() => {
+    if (!timezoneSearch) return allTimezones;
+    
+    const searchLower = timezoneSearch.toLowerCase();
+    return allTimezones.filter(tz => 
+      tz.toLowerCase().includes(searchLower)
+    );
+  }, [allTimezones, timezoneSearch]);
 
   const { data: folders = [] } = useQuery({
     queryKey: ['folders', selectedAccountId],
@@ -119,6 +130,13 @@ export default function WebhookDialog({ open, onClose, webhook, defaultFolderId,
   });
 
   const scheduleType = watch('schedule_type');
+
+  // Clear timezone search when dialog opens/closes
+  useEffect(() => {
+    if (!open) {
+      setTimezoneSearch('');
+    }
+  }, [open]);
 
   useEffect(() => {
     if (webhook) {
@@ -447,11 +465,32 @@ export default function WebhookDialog({ open, onClose, webhook, defaultFolderId,
                       <SelectValue placeholder="Select timezone" />
                     </SelectTrigger>
                     <SelectContent className="max-h-[300px]">
-                      {timezones.map((tz) => (
-                        <SelectItem key={tz} value={tz}>
-                          {tz}
-                        </SelectItem>
-                      ))}
+                      <div className="sticky top-0 z-10 bg-popover p-2 border-b">
+                        <div className="relative">
+                          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Search timezone..."
+                            value={timezoneSearch}
+                            onChange={(e) => setTimezoneSearch(e.target.value)}
+                            className="pl-8"
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                      </div>
+                      <div className="max-h-[200px] overflow-y-auto">
+                        {filteredTimezones.length > 0 ? (
+                          filteredTimezones.map((tz) => (
+                            <SelectItem key={tz} value={tz}>
+                              {tz}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="p-2 text-sm text-muted-foreground text-center">
+                            No timezones found
+                          </div>
+                        )}
+                      </div>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
@@ -489,11 +528,32 @@ export default function WebhookDialog({ open, onClose, webhook, defaultFolderId,
                       <SelectValue placeholder="Select timezone" />
                     </SelectTrigger>
                     <SelectContent className="max-h-[300px]">
-                      {timezones.map((tz) => (
-                        <SelectItem key={tz} value={tz}>
-                          {tz}
-                        </SelectItem>
-                      ))}
+                      <div className="sticky top-0 z-10 bg-popover p-2 border-b">
+                        <div className="relative">
+                          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Search timezone..."
+                            value={timezoneSearch}
+                            onChange={(e) => setTimezoneSearch(e.target.value)}
+                            className="pl-8"
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                      </div>
+                      <div className="max-h-[200px] overflow-y-auto">
+                        {filteredTimezones.length > 0 ? (
+                          filteredTimezones.map((tz) => (
+                            <SelectItem key={tz} value={tz}>
+                              {tz}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="p-2 text-sm text-muted-foreground text-center">
+                            No timezones found
+                          </div>
+                        )}
+                      </div>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
