@@ -28,7 +28,7 @@ export function MoveWebhookDialog({ open, onOpenChange, webhook }: Props) {
 
   const { data: folders = [] } = useQuery({
     queryKey: ['folders'],
-    queryFn: foldersApi.getAll,
+    queryFn: () => foldersApi.getAll(),
     enabled: open,
   });
 
