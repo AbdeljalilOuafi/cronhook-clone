@@ -13,7 +13,7 @@ from rest_framework import status
 from .models import SlackAccount
 from .serializers import SlackAccountSerializer
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('slack_integration')
 
 
 @api_view(['GET'])
@@ -28,7 +28,7 @@ def slack_oauth_callback(request):
     3. Exchange code for access token
     4. Fetch workspace details
     5. Save to slack_accounts table
-    6. Redirect to success page
+    6. Return JSON response with success/failure
     
     URL: https://slack.onsync.ai/oauth/callback?code=xxx&state=xxx
     """
@@ -40,16 +40,24 @@ def slack_oauth_callback(request):
     
     # Handle authorization denial
     if error:
-        logger.error(f"Slack OAuth error: {error}")
-        return redirect(f"{settings.FRONTEND_URL}/slack/error?error={error}")
+        logger.error(f"❌ Slack OAuth Error: User denied authorization - {error}")
+        return JsonResponse({
+            'success': False,
+            'error': error,
+            'message': 'User denied authorization or authorization failed'
+        }, status=400)
     
     if not code:
-        logger.error("No authorization code received from Slack")
-        return redirect(f"{settings.FRONTEND_URL}/slack/error?error=no_code")
+        logger.error("❌ Slack OAuth Error: No authorization code received from Slack")
+        return JsonResponse({
+            'success': False,
+            'error': 'no_code',
+            'message': 'No authorization code received from Slack'
+        }, status=400)
     
     try:
         # 2. Exchange code for access token
-        logger.info(f"Exchanging code for access token...")
+        logger.info(f"🔄 Exchanging authorization code for access token...")
         token_response = requests.post(
             'https://slack.com/api/oauth.v2.access',
             data={
@@ -65,8 +73,13 @@ def slack_oauth_callback(request):
         
         if not token_data.get('ok'):
             error_msg = token_data.get('error', 'unknown_error')
-            logger.error(f"Slack OAuth token exchange failed: {error_msg}")
-            return redirect(f"{settings.FRONTEND_URL}/slack/error?error={error_msg}")
+            logger.error(f"❌ Slack OAuth token exchange failed: {error_msg}")
+            logger.error(f"   Full response: {token_data}")
+            return JsonResponse({
+                'success': False,
+                'error': error_msg,
+                'message': f'Failed to exchange code for token: {error_msg}'
+            }, status=400)
         
         # 3. Extract data from OAuth response
         access_token = token_data.get('access_token')
@@ -74,13 +87,26 @@ def slack_oauth_callback(request):
         team_info = token_data.get('team', {})
         workspace_id = team_info.get('id')
         workspace_name = team_info.get('name')
+        authed_user = token_data.get('authed_user', {})
+        
+        logger.info(f"✅ Successfully obtained access token")
+        logger.info(f"   Workspace: {workspace_name} ({workspace_id})")
+        logger.info(f"   Bot User ID: {bot_user_id}")
+        logger.info(f"   Authorized User: {authed_user.get('id', 'N/A')}")
         
         if not all([access_token, workspace_id, workspace_name]):
-            logger.error("Missing required data in Slack OAuth response")
-            return redirect(f"{settings.FRONTEND_URL}/slack/error?error=missing_data")
+            logger.error(f"❌ Missing required data in Slack OAuth response")
+            logger.error(f"   Access Token: {'Present' if access_token else 'Missing'}")
+            logger.error(f"   Workspace ID: {workspace_id or 'Missing'}")
+            logger.error(f"   Workspace Name: {workspace_name or 'Missing'}")
+            return JsonResponse({
+                'success': False,
+                'error': 'missing_data',
+                'message': 'Incomplete data received from Slack OAuth'
+            }, status=400)
         
         # 4. Fetch workspace URL using team.info API
-        logger.info(f"Fetching workspace details for {workspace_id}...")
+        logger.info(f"🔄 Fetching additional workspace details...")
         team_info_response = requests.get(
             'https://slack.com/api/team.info',
             headers={'Authorization': f'Bearer {access_token}'},
@@ -94,16 +120,39 @@ def slack_oauth_callback(request):
             domain = team_info_data.get('team', {}).get('domain')
             if domain:
                 workspace_url = f"{domain}.slack.com"
+                logger.info(f"   Workspace URL: {workspace_url}")
         else:
-            logger.warning(f"Could not fetch team.info: {team_info_data.get('error')}")
+            logger.warning(f"⚠️  Could not fetch team.info: {team_info_data.get('error')}")
+            logger.warning(f"   Continuing without workspace URL")
         
-        # 5. Get or determine client_account_id
-        # You can customize this logic based on your needs
-        # For now, we'll use the state parameter or a default account
-        client_account_id = request.GET.get('account_id', 1)  # Default to account 1
+        # 5. Get client_account_id from state or query parameter
+        client_account_id = None
+        
+        # Try to extract from state parameter
+        if state and state.startswith('account_'):
+            try:
+                client_account_id = int(state.replace('account_', ''))
+                logger.info(f"   Client Account ID from state: {client_account_id}")
+            except ValueError:
+                logger.warning(f"⚠️  Invalid account_id in state: {state}")
+        
+        # Fallback to query parameter
+        if not client_account_id:
+            account_id_param = request.GET.get('account_id')
+            if account_id_param:
+                try:
+                    client_account_id = int(account_id_param)
+                    logger.info(f"   Client Account ID from query: {client_account_id}")
+                except ValueError:
+                    logger.warning(f"⚠️  Invalid account_id parameter: {account_id_param}")
+        
+        # Default to account 1 if not specified
+        if not client_account_id:
+            client_account_id = 1
+            logger.warning(f"⚠️  No account_id specified, defaulting to: {client_account_id}")
         
         # 6. Save to slack_accounts table
-        logger.info(f"Saving Slack account: {workspace_name} ({workspace_id})")
+        logger.info(f"💾 Saving Slack account to database...")
         slack_account, created = SlackAccount.objects.update_or_create(
             workspace_id=workspace_id,
             defaults={
@@ -116,19 +165,43 @@ def slack_oauth_callback(request):
         )
         
         action = "created" if created else "updated"
-        logger.info(f"Slack account {action}: {slack_account}")
+        logger.info(f"✅ Slack account {action} successfully!")
+        logger.info(f"   Workspace ID: {workspace_id}")
+        logger.info(f"   Workspace Name: {workspace_name}")
+        logger.info(f"   Workspace URL: {workspace_url or 'N/A'}")
+        logger.info(f"   Bot User ID: {bot_user_id or 'N/A'}")
+        logger.info(f"   Client Account: {client_account_id}")
+        logger.info(f"   Action: {action.upper()}")
         
-        # 7. Redirect to success page
-        success_url = f"{settings.FRONTEND_URL}/slack/success?workspace={workspace_name}"
-        return redirect(success_url)
+        # 7. Return success response
+        return JsonResponse({
+            'success': True,
+            'action': action,
+            'data': {
+                'workspace_id': workspace_id,
+                'workspace_name': workspace_name,
+                'workspace_url': workspace_url,
+                'bot_user_id': bot_user_id,
+                'client_account_id': client_account_id
+            },
+            'message': f'Slack workspace "{workspace_name}" {action} successfully'
+        }, status=201 if created else 200)
         
     except requests.RequestException as e:
-        logger.error(f"Network error during Slack OAuth: {str(e)}")
-        return redirect(f"{settings.FRONTEND_URL}/slack/error?error=network_error")
+        logger.error(f"❌ Network error during Slack OAuth: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'success': False,
+            'error': 'network_error',
+            'message': f'Network error while communicating with Slack: {str(e)}'
+        }, status=500)
     
     except Exception as e:
-        logger.error(f"Unexpected error during Slack OAuth: {str(e)}", exc_info=True)
-        return redirect(f"{settings.FRONTEND_URL}/slack/error?error=server_error")
+        logger.error(f"❌ Unexpected error during Slack OAuth: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'success': False,
+            'error': 'server_error',
+            'message': f'An unexpected error occurred: {str(e)}'
+        }, status=500)
 
 
 @api_view(['GET'])
@@ -144,6 +217,10 @@ def slack_oauth_install(request):
     """
     account_id = request.GET.get('account_id', '')
     
+    logger.info(f"🚀 Starting Slack OAuth flow")
+    if account_id:
+        logger.info(f"   Client Account ID: {account_id}")
+    
     # Build Slack authorization URL
     slack_auth_url = (
         f"https://slack.com/oauth/v2/authorize"
@@ -156,6 +233,7 @@ def slack_oauth_install(request):
     if account_id:
         slack_auth_url += f"&state=account_{account_id}"
     
+    logger.info(f"   Redirecting to Slack authorization page")
     return redirect(slack_auth_url)
 
 
@@ -163,16 +241,22 @@ def slack_oauth_install(request):
 def list_slack_accounts(request):
     """
     List all Slack accounts for the authenticated user's account.
-
-    Optional filters: authorizing again. If problems persist, contact support for help.
+    
+    Optional filters:
     - account_id: Filter by client account
     """
     account_id = request.query_params.get('account_id')
+    
+    logger.info(f"📋 Listing Slack accounts")
+    if account_id:
+        logger.info(f"   Filtered by account_id: {account_id}")
     
     queryset = SlackAccount.objects.all()
     
     if account_id:
         queryset = queryset.filter(client_account_id=account_id)
+    
+    logger.info(f"   Found {queryset.count()} Slack account(s)")
     
     serializer = SlackAccountSerializer(queryset, many=True)
     return Response(serializer.data)
@@ -183,16 +267,32 @@ def disconnect_slack_account(request, workspace_id):
     """
     Disconnect/delete a Slack account.
     """
+    logger.info(f"🗑️  Attempting to disconnect Slack workspace: {workspace_id}")
+    
     try:
         slack_account = SlackAccount.objects.get(workspace_id=workspace_id)
+        workspace_name = slack_account.workspace_name
+        
         slack_account.delete()
+        
+        logger.info(f"✅ Slack workspace disconnected successfully")
+        logger.info(f"   Workspace ID: {workspace_id}")
+        logger.info(f"   Workspace Name: {workspace_name}")
+        
         return Response(
-            {"detail": f"Slack workspace {workspace_id} disconnected successfully"},
+            {
+                "success": True,
+                "detail": f"Slack workspace '{workspace_name}' ({workspace_id}) disconnected successfully"
+            },
             status=status.HTTP_200_OK
         )
     except SlackAccount.DoesNotExist:
+        logger.warning(f"⚠️  Slack workspace not found: {workspace_id}")
         return Response(
-            {"detail": "Slack workspace not found"},
+            {
+                "success": False,
+                "detail": f"Slack workspace {workspace_id} not found"
+            },
             status=status.HTTP_404_NOT_FOUND
         )
 
@@ -203,11 +303,20 @@ def slack_oauth_test(request):
     """
     Test endpoint to verify Slack OAuth configuration.
     """
+    logger.info(f"🔍 Testing Slack OAuth configuration")
+    
+    client_id_configured = bool(getattr(settings, 'SLACK_CLIENT_ID', None))
+    client_secret_configured = bool(getattr(settings, 'SLACK_CLIENT_SECRET', None))
+    redirect_uri = getattr(settings, 'SLACK_REDIRECT_URI', None)
+    
+    logger.info(f"   Client ID configured: {client_id_configured}")
+    logger.info(f"   Client Secret configured: {client_secret_configured}")
+    logger.info(f"   Redirect URI: {redirect_uri}")
+    
     config_status = {
-        'client_id_configured': bool(getattr(settings, 'SLACK_CLIENT_ID', None)),
-        'client_secret_configured': bool(getattr(settings, 'SLACK_CLIENT_SECRET', None)),
-        'redirect_uri': getattr(settings, 'SLACK_REDIRECT_URI', None),
-        'frontend_url': getattr(settings, 'FRONTEND_URL', None),
+        'client_id_configured': client_id_configured,
+        'client_secret_configured': client_secret_configured,
+        'redirect_uri': redirect_uri,
     }
     
     return Response(config_status)
