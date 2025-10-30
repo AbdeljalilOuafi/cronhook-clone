@@ -174,19 +174,8 @@ def slack_oauth_callback(request):
         logger.info(f"   Client Account: {client_account_id}")
         logger.info(f"   Action: {action.upper()}")
         
-        # 7. Return success response
-        return JsonResponse({
-            'success': True,
-            'action': action,
-            'data': {
-                'workspace_id': workspace_id,
-                'workspace_name': workspace_name,
-                'workspace_url': workspace_url,
-                'bot_user_id': bot_user_id,
-                'client_account_id': client_account_id
-            },
-            'message': f'Slack workspace "{workspace_name}" {action} successfully'
-        }, status=201 if created else 200)
+        # 7. Redirect to success page
+        return redirect('https://onsync.ai/slack-app-success')
         
     except requests.RequestException as e:
         logger.error(f"❌ Network error during Slack OAuth: {str(e)}", exc_info=True)
