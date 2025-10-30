@@ -19,8 +19,6 @@ class Account(models.Model):
     location = models.TextField(null=True, blank=True)
     stripe_api_key = models.TextField(null=True, blank=True)
     trz_api_key = models.TextField(null=True, blank=True)  # Fixed field name
-    slack_workspace_url = models.CharField(max_length=255, null=True, blank=True)
-    slack_app_token = models.CharField(max_length=255, null=True, blank=True)  # Fixed field name
     domain_name_main = models.CharField(max_length=255, null=True, blank=True)
     website_url = models.CharField(max_length=255, null=True, blank=True)
     date_joined = models.DateField(null=True, blank=True)
