@@ -10,9 +10,9 @@ import type { Webhook } from '@/types';
 export default function ExecutionsPage() {
   const [selectedWebhook, setSelectedWebhook] = useState<Webhook | null>(null);
 
-  const { data: webhooks, isLoading: isLoadingWebhooks } = useQuery({
+  const { data: webhooks = [], isLoading: isLoadingWebhooks } = useQuery<Webhook[]>({
     queryKey: ['webhooks'],
-    queryFn: webhooksApi.getAll,
+    queryFn: () => webhooksApi.getAll(),
   });
 
   const { data: executions, isLoading: isLoadingExecutions } = useQuery({

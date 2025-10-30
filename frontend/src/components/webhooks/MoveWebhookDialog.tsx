@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import type { Webhook } from '@/types';
+import type { Webhook, WebhookFolder } from '@/types';
 import { Loader2, Folder, FolderOpen } from 'lucide-react';
 
 interface Props {
@@ -26,9 +26,9 @@ export function MoveWebhookDialog({ open, onOpenChange, webhook }: Props) {
   const queryClient = useQueryClient();
   const [selectedFolderId, setSelectedFolderId] = useState<number | null>(webhook.folder || null);
 
-  const { data: folders = [] } = useQuery({
+  const { data: folders = [] } = useQuery<WebhookFolder[]>({
     queryKey: ['folders'],
-    queryFn: foldersApi.getAll,
+    queryFn: () => foldersApi.getAll(),
     enabled: open,
   });
 
