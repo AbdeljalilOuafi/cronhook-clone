@@ -8,6 +8,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, Sp
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('webhooks.urls')),
+    path('', include('slack_integration.urls')),  # Slack OAuth endpoints
     
     # API Documentation
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),

@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     
     # Local apps
     'webhooks',
+    'slack_integration',
 ]
 
 MIDDLEWARE = [
@@ -199,3 +200,10 @@ CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 # Webhook Settings
 DEFAULT_WEBHOOK_TIMEOUT = env.int('DEFAULT_WEBHOOK_TIMEOUT', default=30)
 MAX_RETRY_ATTEMPTS = env.int('MAX_RETRY_ATTEMPTS', default=3)
+
+
+# Slack OAuth Settings
+SLACK_CLIENT_ID = env('SLACK_CLIENT_ID', default='')
+SLACK_CLIENT_SECRET = env('SLACK_CLIENT_SECRET', default='')
+SLACK_REDIRECT_URI = env('SLACK_REDIRECT_URI', default='https://slack.onsync.ai/oauth/callback')
+FRONTEND_URL = env('FRONTEND_URL', default='https://onsync.ai')
