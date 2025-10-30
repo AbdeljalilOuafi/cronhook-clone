@@ -57,6 +57,7 @@ def slack_oauth_callback(request):
     
     try:
         # 2. Exchange code for access token
+        logger.info(f"Code Received: {code}")
         logger.info(f"🔄 Exchanging authorization code for access token...")
         token_response = requests.post(
             'https://slack.com/api/oauth.v2.access',
@@ -219,13 +220,14 @@ def slack_oauth_install(request):
     
     logger.info(f"🚀 Starting Slack OAuth flow")
     if account_id:
-        logger.info(f"   Client Account ID: {account_id}")
+        logger.info(f" Client Account ID: {account_id}")
     
     # Build Slack authorization URL
     slack_auth_url = (
         f"https://slack.com/oauth/v2/authorize"
         f"?client_id={settings.SLACK_CLIENT_ID}"
-        f"&scope=chat:write,channels:read,users:read"
+        f"&scope=app_mentions:read"
+        f"&user_scope=channels:history,channels:read,channels:write,channels:write.invites,channels:write.topic,chat:write,groups:history,groups:read,groups:write,groups:write.invites,groups:write.topic,users:read,users:read.email,users:write,files:write,im:write,im:history,im:read,im:write.topic,files:read"
         f"&redirect_uri={settings.SLACK_REDIRECT_URI}"
     )
     
