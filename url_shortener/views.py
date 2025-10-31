@@ -53,7 +53,7 @@ def create_short_url(request):
     POST /api/shorten/
     Body: {
         "original_url": "https://checkout.stripe.com/pay/cs_test_...",
-        "domain": "pay.ao.com",  // Optional, uses account's domain if not provided
+        "domain": "pay.onsync-test.xyz",  // Optional, auto-detected from request
         "title": "Payment Link",  // Optional
         "short_code": "abc123",  // Optional, auto-generated if not provided
         "expires_at": "2024-12-31T23:59:59Z"  // Optional
@@ -63,22 +63,36 @@ def create_short_url(request):
         "id": 1,
         "short_code": "abc123",
         "original_url": "https://checkout.stripe.com/...",
-        "domain": "pay.ao.com",
-        "full_short_url": "https://pay.ao.com/abc123",
+        "domain": "pay.onsync-test.xyz",
+        "full_short_url": "https://pay.onsync-test.xyz/abc123",
         "clicks": 0,
         "created_at": "2024-01-15T10:30:00Z"
     }
     """
+    # Get account from user
+    try:
+        from webhooks.models import Account
+        account = Account.objects.get(user=request.user)
+    except Account.DoesNotExist:
+        return Response(
+            {'error': 'No account found for this user'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
     serializer = ShortURLCreateSerializer(
         data=request.data,
-        context={'account': request.user}
+        context={'account': account, 'request': request}
     )
     
     if serializer.is_valid():
         short_url = serializer.save()
         response_serializer = ShortURLResponseSerializer(short_url)
-        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+        return Response({
+            'status': 'success',
+            'data': response_serializer.data
+        }, status=status.HTTP_201_CREATED)
     
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

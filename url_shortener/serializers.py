@@ -9,28 +9,22 @@ class ShortURLCreateSerializer(serializers.ModelSerializer):
     """
     Serializer for creating short URLs.
     Used by n8n workflows to shorten Stripe payment links.
+    
+    Domain handling:
+    - If domain is provided, it will be used (must be in ALLOWED_SHORT_URL_DOMAINS)
+    - If not provided, uses request domain from middleware
+    - Falls back to account.short_url_domain with 'pay.' prefix
     """
-    # Make domain optional - will use account's short_url_domain if not provided
-    domain = serializers.CharField(required=False, allow_blank=True)
+    domain = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    short_code = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     
     class Meta:
         model = ShortURL
         fields = ['original_url', 'domain', 'title', 'short_code', 'expires_at']
         extra_kwargs = {
-            'short_code': {'required': False},  # Auto-generated if not provided
             'title': {'required': False},
             'expires_at': {'required': False},
         }
-    
-    def validate_domain(self, value):
-        """Validate that the domain belongs to the account"""
-        if value:
-            account = self.context.get('account')
-            if account and value != account.short_url_domain:
-                raise serializers.ValidationError(
-                    f"Domain '{value}' does not match your account's short URL domain."
-                )
-        return value
     
     def validate_original_url(self, value):
         """Basic URL validation"""
@@ -40,17 +34,45 @@ class ShortURLCreateSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         """Create short URL with account context"""
+        from django.conf import settings
+        
         account = self.context.get('account')
+        request = self.context.get('request')
         
-        # Use account's domain if not provided
-        if 'domain' not in validated_data or not validated_data['domain']:
-            if not account.short_url_domain:
+        # Determine domain to use
+        domain = validated_data.get('domain')
+        
+        if not domain:
+            # Try to get domain from request (set by middleware)
+            if request and hasattr(request, 'original_host'):
+                domain = request.original_host
+            # Fall back to account's short_url_domain with 'pay.' prefix
+            elif account and account.short_url_domain:
+                # If account has 'onsync-test.xyz', use 'pay.onsync-test.xyz'
+                base_domain = account.short_url_domain
+                if not base_domain.startswith('pay.'):
+                    domain = f'pay.{base_domain}'
+                else:
+                    domain = base_domain
+            else:
                 raise serializers.ValidationError({
-                    'domain': 'No domain specified and account has no default short URL domain configured.'
+                    'domain': 'No domain specified and could not determine domain automatically.'
                 })
-            validated_data['domain'] = account.short_url_domain
         
+        # Validate domain is in allowed list
+        allowed_domains = getattr(settings, 'ALLOWED_SHORT_URL_DOMAINS', [])
+        if allowed_domains and domain not in allowed_domains:
+            raise serializers.ValidationError({
+                'domain': f"Domain '{domain}' is not in the allowed domains list."
+            })
+        
+        validated_data['domain'] = domain
         validated_data['account'] = account
+        
+        # Remove None values for optional fields
+        if 'short_code' in validated_data and not validated_data['short_code']:
+            validated_data.pop('short_code')
+        
         return super().create(validated_data)
 
 
