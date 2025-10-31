@@ -8,7 +8,7 @@ from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from datetime import timedelta
 
@@ -107,6 +107,7 @@ def create_short_url(request):
 
 
 @api_view(['GET'])
+@permission_classes([AllowAny])  # Public endpoint - no authentication required
 def redirect_short_url(request, short_code):
     """
     Redirect from short URL to original URL.
