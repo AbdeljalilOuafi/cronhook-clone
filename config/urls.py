@@ -8,10 +8,15 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, Sp
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('webhooks.urls')),
-    path('', include('slack_integration.urls')),  # Slack OAuth endpoints
     
     # API Documentation
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/schema/swagger-ui/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/schema/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    
+    # Slack OAuth endpoints (must come before url_shortener catch-all)
+    path('', include('slack_integration.urls')),
+    
+    # URL Shortener (catch-all must be LAST)
+    path('', include('url_shortener.urls')),
 ]

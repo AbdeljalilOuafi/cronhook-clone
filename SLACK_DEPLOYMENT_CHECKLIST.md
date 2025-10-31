@@ -19,10 +19,11 @@ SSH to your server and edit `.env`:
 SLACK_CLIENT_ID=your_slack_client_id_here
 SLACK_CLIENT_SECRET=your_slack_client_secret_here
 SLACK_REDIRECT_URI=https://slack.onsync.ai/oauth/callback
-FRONTEND_URL=https://onsync.ai
 ```
 
 Get these from: https://api.slack.com/apps → Your App → OAuth & Permissions
+
+**Note**: No frontend URL needed - the OAuth callback returns JSON responses instead of redirects.
 
 ### 2. Configure DNS (Already Done?)
 
@@ -129,8 +130,7 @@ Expected response:
 {
   "client_id_configured": true,
   "client_secret_configured": true,
-  "redirect_uri": "https://slack.onsync.ai/oauth/callback",
-  "frontend_url": "https://onsync.ai"
+  "redirect_uri": "https://slack.onsync.ai/oauth/callback"
 }
 ```
 
@@ -145,8 +145,23 @@ Should redirect to Slack authorization page.
 
 **Test 3: Complete Flow**
 1. Authorize the app
-2. Should redirect to: `https://onsync.ai/slack/success?workspace=WorkspaceName`
-3. Check database for new entry
+2. Should receive JSON response:
+```json
+{
+  "success": true,
+  "action": "created",
+  "data": {
+    "workspace_id": "T12345678",
+    "workspace_name": "My Workspace",
+    "workspace_url": "myworkspace.slack.com",
+    "bot_user_id": "U98765432",
+    "client_account_id": 1
+  },
+  "message": "Slack workspace 'My Workspace' created successfully"
+}
+```
+3. Check server logs for detailed information
+4. Check database for new entry
 
 **Test 4: Check Database**
 ```bash
@@ -171,89 +186,95 @@ All accessible at `https://slack.onsync.ai`:
 | `/accounts/` | List Slack workspaces (requires auth) |
 | `/accounts/<id>/disconnect` | Remove workspace |
 
-## 🎨 Frontend Integration Needed
+## 🎨 OAuth Response Handling
 
-You need to create two pages in your frontend:
+The OAuth callback returns JSON responses instead of redirects. All success and failure information is logged.
 
-### 1. Success Page: `/slack/success`
+### Success Response
 
-URL will be: `https://onsync.ai/slack/success?workspace=WorkspaceName`
+When OAuth succeeds, you'll get:
 
-```tsx
-// Example React component
-import { useSearchParams } from 'react-router-dom';
-import { toast } from 'sonner';
-
-export default function SlackSuccess() {
-  const [searchParams] = useSearchParams();
-  const workspace = searchParams.get('workspace');
-  
-  useEffect(() => {
-    if (workspace) {
-      toast.success(`Successfully connected to ${workspace}!`);
-    }
-  }, [workspace]);
-  
-  return (
-    <div>
-      <h1>Slack Connected!</h1>
-      <p>Your workspace "{workspace}" has been connected successfully.</p>
-      <Link to="/dashboard">Go to Dashboard</Link>
-    </div>
-  );
+```json
+{
+  "success": true,
+  "action": "created",  // or "updated"
+  "data": {
+    "workspace_id": "T12345678",
+    "workspace_name": "My Workspace",
+    "workspace_url": "myworkspace.slack.com",
+    "bot_user_id": "U98765432",
+    "client_account_id": 1
+  },
+  "message": "Slack workspace 'My Workspace' created successfully"
 }
 ```
 
-### 2. Error Page: `/slack/error`
+### Error Response
 
-URL will be: `https://onsync.ai/slack/error?error=error_code`
+When OAuth fails, you'll get:
 
-```tsx
-import { useSearchParams } from 'react-router-dom';
-
-const ERROR_MESSAGES = {
-  'access_denied': 'Authorization was cancelled',
-  'no_code': 'No authorization code received',
-  'missing_data': 'Incomplete data from Slack',
-  'network_error': 'Network connection failed',
-  'server_error': 'An unexpected error occurred'
-};
-
-export default function SlackError() {
-  const [searchParams] = useSearchParams();
-  const error = searchParams.get('error');
-  const message = ERROR_MESSAGES[error] || 'Installation failed';
-  
-  return (
-    <div>
-      <h1>Connection Failed</h1>
-      <p>{message}</p>
-      <button onClick={() => window.location.href = '/slack/install'}>
-        Try Again
-      </button>
-    </div>
-  );
+```json
+{
+  "success": false,
+  "error": "error_code",
+  "message": "Human-readable error message"
 }
 ```
 
-### 3. "Add to Slack" Button
+### Possible Error Codes
 
-Add anywhere in your app:
+- `access_denied` - User denied authorization
+- `no_code` - No authorization code received
+- `missing_data` - Incomplete data from Slack
+- `network_error` - Network connection failed
+- `server_error` - Unexpected server error
 
-```tsx
-<a 
-  href={`https://slack.onsync.ai/oauth/install?account_id=${accountId}`}
-  className="inline-block"
->
-  <img 
-    alt="Add to Slack" 
-    src="https://platform.slack-edge.com/img/add_to_slack.png" 
-    srcSet="https://platform.slack-edge.com/img/add_to_slack.png 1x, 
-            https://platform.slack-edge.com/img/add_to_slack@2x.png 2x" 
-    width="139" 
-    height="40" 
-  />
-</a>
+### Server Logs
+
+All OAuth events are logged with emojis for easy scanning:
+
+```
+🚀 Starting Slack OAuth flow
+   Client Account ID: 1
+   Redirecting to Slack authorization page
+
+🔄 Exchanging authorization code for access token...
+✅ Successfully obtained access token
+   Workspace: My Workspace (T12345678)
+   Bot User ID: U98765432
+
+🔄 Fetching additional workspace details...
+   Workspace URL: myworkspace.slack.com
+
+💾 Saving Slack account to database...
+✅ Slack account created successfully!
+   Workspace ID: T12345678
+   Workspace Name: My Workspace
+   Workspace URL: myworkspace.slack.com
+   Bot User ID: U98765432
+   Client Account: 1
+   Action: CREATED
+```
+
+Error logs use ❌ and ⚠️ emojis:
+
+```
+❌ Slack OAuth Error: User denied authorization - access_denied
+❌ Slack OAuth token exchange failed: invalid_code
+⚠️  Could not fetch team.info: missing_scope
+```
+
+### Viewing Logs
+
+```bash
+# View real-time logs
+tail -f /var/log/cronhooks/error.log | grep slack_integration
+
+# Or if using journalctl
+journalctl -u cronhooks-web -f | grep slack_integration
+
+# Search for specific workspace
+grep "T12345678" /var/log/cronhooks/error.log
 ```
 
 ## 🔍 Troubleshooting
@@ -286,7 +307,7 @@ python manage.py dbshell
 
 ## ✅ Final Checklist
 
-- [ ] Environment variables added to server .env
+- [ ] Environment variables added to server .env (CLIENT_ID, CLIENT_SECRET, REDIRECT_URI)
 - [ ] DNS A record created for slack.onsync.ai
 - [ ] Nginx configured and enabled
 - [ ] SSL certificate obtained
@@ -295,9 +316,8 @@ python manage.py dbshell
 - [ ] Service restarted
 - [ ] Slack app redirect URI configured
 - [ ] OAuth flow tested
-- [ ] Frontend success page created
-- [ ] Frontend error page created
-- [ ] "Add to Slack" button added to UI
+- [ ] Logging configured and working
+- [ ] Integration tested from white-labeled CRM
 
 ## 📚 Documentation Reference
 
@@ -309,11 +329,18 @@ python manage.py dbshell
 
 Your Slack OAuth integration is **code-complete** and **locally tested**. 
 
+**Key Changes:**
+- ✅ No frontend redirects - returns JSON responses
+- ✅ Comprehensive logging with emoji indicators
+- ✅ All success/failure info in server logs
+- ✅ White-labeled CRM can parse JSON responses
+
 Next immediate actions:
 1. Deploy to server
 2. Configure nginx + SSL
 3. Add environment variables
 4. Test OAuth flow
-5. Create frontend pages
+5. Configure logging
+6. Integrate with your white-labeled CRM
 
-Once deployed, users will be able to click "Add to Slack" and connect their workspaces!
+Once deployed, users can authorize via your white-labeled CRM, and you'll have full visibility through logs!

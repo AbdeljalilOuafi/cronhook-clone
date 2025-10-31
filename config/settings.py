@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     # Local apps
     'webhooks',
     'slack_integration',
+    'url_shortener',
 ]
 
 MIDDLEWARE = [
@@ -56,6 +57,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'url_shortener.middleware.MultiDomainMiddleware',
 ]
 
 CORS_ALLOWED_ORIGINS = [
@@ -206,4 +208,10 @@ MAX_RETRY_ATTEMPTS = env.int('MAX_RETRY_ATTEMPTS', default=3)
 SLACK_CLIENT_ID = env('SLACK_CLIENT_ID', default='')
 SLACK_CLIENT_SECRET = env('SLACK_CLIENT_SECRET', default='')
 SLACK_REDIRECT_URI = env('SLACK_REDIRECT_URI', default='https://slack.onsync.ai/oauth/callback')
-FRONTEND_URL = env('FRONTEND_URL', default='https://onsync.ai')
+
+
+ALLOWED_SHORT_URL_DOMAINS = [
+    'pay.ao.com',
+    'pay.aollc.com',
+    # Add other client domains
+]

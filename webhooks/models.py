@@ -21,6 +21,12 @@ class Account(models.Model):
     trz_api_key = models.TextField(null=True, blank=True)  # Fixed field name
     domain_name_main = models.CharField(max_length=255, null=True, blank=True)
     website_url = models.CharField(max_length=255, null=True, blank=True)
+    short_url_domain = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Custom domain for short URLs (e.g., 'pay.ao.com')"
+    )
     date_joined = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
