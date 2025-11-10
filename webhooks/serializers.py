@@ -95,6 +95,7 @@ class WebhookSerializer(serializers.ModelSerializer):
     folder_name = serializers.CharField(source='folder.name', read_only=True)
     folder_color = serializers.CharField(source='folder.color', read_only=True)
     account_name = serializers.CharField(source='account.name', read_only=True)
+    account_id = serializers.IntegerField(write_only=True, required=False)
     
     class Meta:
         model = Webhook
@@ -103,7 +104,7 @@ class WebhookSerializer(serializers.ModelSerializer):
             'schedule_type', 'cron_expression', 'scheduled_at', 'timezone',
             'is_active', 'max_retries', 'retry_delay', 'timeout',
             'folder', 'folder_name', 'folder_color',
-            'account', 'account_name',
+            'account', 'account_name', 'account_id',
             'last_execution_at', 'execution_count', 'last_execution_status',
             'created_at', 'updated_at'
         ]
@@ -176,9 +177,13 @@ class WebhookSerializer(serializers.ModelSerializer):
         # Set user from request context
         validated_data['user'] = self.context['request'].user
         
-        # If account is provided, use it; otherwise check if user is acting on behalf of an account
-        # (stored in request session/context for superusers)
-        if 'account' not in validated_data:
+        # Handle account_id from request body
+        account_id = validated_data.pop('account_id', None)
+        if account_id:
+            validated_data['account_id'] = account_id
+        elif 'account' not in validated_data:
+            # Fallback: check if user is acting on behalf of an account
+            # (stored in request session/context for superusers)
             request = self.context.get('request')
             if request and hasattr(request, 'selected_account_id'):
                 validated_data['account_id'] = request.selected_account_id
@@ -193,6 +198,11 @@ class WebhookSerializer(serializers.ModelSerializer):
     
     def update(self, instance, validated_data):
         """Update webhook and reschedule if needed."""
+        # Handle account_id from request body
+        account_id = validated_data.pop('account_id', None)
+        if account_id:
+            validated_data['account_id'] = account_id
+        
         # Cancel existing schedule
         from .tasks import cancel_webhook_schedule
         cancel_webhook_schedule(instance.id)
@@ -215,7 +225,7 @@ class WebhookCreateSerializer(WebhookSerializer):
         fields = [
             'name', 'url', 'http_method', 'headers', 'payload',
             'schedule_type', 'cron_expression', 'scheduled_at', 'timezone',
-            'max_retries', 'retry_delay', 'timeout', 'folder', 'account'
+            'max_retries', 'retry_delay', 'timeout', 'folder', 'account', 'account_id'
         ]
 
 
