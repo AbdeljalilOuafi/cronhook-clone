@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { webhooksApi } from '@/api/webhooks';
 import type { Webhook } from '@/types';
-import { formatUTCForDisplay, formatScheduledTime } from '@/lib/timezone-utils';
+import { formatScheduledTime } from '@/lib/timezone-utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
