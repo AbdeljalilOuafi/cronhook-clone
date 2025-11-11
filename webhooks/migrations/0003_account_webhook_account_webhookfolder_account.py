@@ -11,36 +11,30 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # Use RunSQL with no-op since the accounts table already exists
-        migrations.RunSQL(
-            sql="SELECT 1;",  # No-op SQL
-            reverse_sql="SELECT 1;",
-            state_operations=[
-                migrations.CreateModel(
-                    name='Account',
-                    fields=[
-                        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                        ('name', models.CharField(max_length=255)),
-                        ('email', models.EmailField(blank=True, max_length=255, null=True, unique=True)),
-                        ('ceo_name', models.CharField(blank=True, max_length=255, null=True)),
-                        ('niche', models.CharField(blank=True, max_length=255, null=True)),
-                        ('location', models.TextField(blank=True, null=True)),
-                        ('stripe_api_key', models.TextField(blank=True, null=True)),
-                        ('trainerize_api_key', models.TextField(blank=True, null=True)),
-                        ('slack_workspace_url', models.CharField(blank=True, max_length=255, null=True)),
-                        ('slack_api_account_id', models.CharField(blank=True, max_length=255, null=True)),
-                        ('domain_name_main', models.CharField(blank=True, max_length=255, null=True)),
-                        ('website_url', models.CharField(blank=True, max_length=255, null=True)),
-                        ('date_joined', models.DateField(blank=True, null=True)),
-                        ('created_at', models.DateTimeField(auto_now_add=True)),
-                        ('updated_at', models.DateTimeField(auto_now=True)),
-                    ],
-                    options={
-                        'db_table': 'accounts',
-                        'ordering': ['name'],
-                    },
-                ),
-            ]
+        # Create the Account model
+        migrations.CreateModel(
+            name='Account',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('name', models.CharField(max_length=255)),
+                ('email', models.EmailField(blank=True, max_length=255, null=True, unique=True)),
+                ('ceo_name', models.CharField(blank=True, max_length=255, null=True)),
+                ('niche', models.CharField(blank=True, max_length=255, null=True)),
+                ('location', models.TextField(blank=True, null=True)),
+                ('stripe_api_key', models.TextField(blank=True, null=True)),
+                ('trainerize_api_key', models.TextField(blank=True, null=True)),
+                ('slack_workspace_url', models.CharField(blank=True, max_length=255, null=True)),
+                ('slack_api_account_id', models.CharField(blank=True, max_length=255, null=True)),
+                ('domain_name_main', models.CharField(blank=True, max_length=255, null=True)),
+                ('website_url', models.CharField(blank=True, max_length=255, null=True)),
+                ('date_joined', models.DateField(blank=True, null=True)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('updated_at', models.DateTimeField(auto_now=True)),
+            ],
+            options={
+                'db_table': 'accounts',
+                'ordering': ['name'],
+            },
         ),
         migrations.AddField(
             model_name='webhook',
