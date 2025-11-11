@@ -242,6 +242,7 @@ class WebhookListSerializer(serializers.ModelSerializer):
         model = Webhook
         fields = [
             'id', 'name', 'url', 'http_method', 'schedule_type',
+            'scheduled_at', 'cron_expression', 'timezone',
             'is_active', 'folder', 'folder_name', 'folder_color',
             'account', 'account_name',
             'last_execution_at', 'execution_count', 'last_execution_status',

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { webhooksApi } from '@/api/webhooks';
 import type { Webhook } from '@/types';
-import { formatUTCForDisplay } from '@/lib/timezone-utils';
+import { formatUTCForDisplay, formatScheduledTime } from '@/lib/timezone-utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -384,18 +384,22 @@ export default function WebhooksPage() {
                       {webhook.schedule_type === 'once' ? 'One-time' : 'Recurring'}
                     </span>
                   </div>
+                  
+                  {/* Show scheduled time for one-time webhooks */}
                   {webhook.schedule_type === 'once' && webhook.scheduled_at && (
                     <div>
                       <span className="text-muted-foreground">Scheduled:</span>{' '}
-                      <span className="font-medium">
-                        {formatUTCForDisplay(webhook.scheduled_at)}
+                      <span className="font-medium font-mono text-xs">
+                        {formatScheduledTime(webhook.scheduled_at)}
                       </span>
                     </div>
                   )}
+                  
+                  {/* Show cron expression for recurring webhooks */}
                   {webhook.schedule_type === 'recurring' && webhook.cron_expression && (
                     <div>
                       <span className="text-muted-foreground">Cron:</span>{' '}
-                      <span className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
+                      <span className="font-mono text-xs bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-slate-100 px-2 py-1 rounded">
                         {webhook.cron_expression}
                       </span>
                     </div>

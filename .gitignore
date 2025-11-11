@@ -32,6 +32,7 @@ db.sqlite3
 db.sqlite3-journal
 media/
 staticfiles/
+config/settings.py
 
 # Environment
 .env
@@ -53,3 +54,7 @@ celerybeat.pid
 
 # Redis
 dump.rdb
+
+
+#Other
+utils/

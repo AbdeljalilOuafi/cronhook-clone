@@ -97,3 +97,28 @@ export function getUserTimezone(): string {
   const sign = offset >= 0 ? '+' : '';
   return `UTC${sign}${offset}`;
 }
+
+/**
+ * Formats a UTC ISO string in DD/MM/YYYY HH:mm:ss format in user's local timezone.
+ * 
+ * @param utcDateTime - ISO 8601 UTC string (e.g., "2025-10-25T09:00:00Z")
+ * @returns Formatted string like "25/10/2025 10:00:00"
+ * 
+ * @example
+ * const display = formatScheduledTime("2025-10-25T09:00:00Z");
+ * // For user in Morocco (UTC+1): "25/10/2025 10:00:00"
+ */
+export function formatScheduledTime(utcDateTime: string): string {
+  if (!utcDateTime) return '';
+  
+  const utcDate = new Date(utcDateTime);
+  
+  const day = String(utcDate.getDate()).padStart(2, '0');
+  const month = String(utcDate.getMonth() + 1).padStart(2, '0');
+  const year = utcDate.getFullYear();
+  const hours = String(utcDate.getHours()).padStart(2, '0');
+  const minutes = String(utcDate.getMinutes()).padStart(2, '0');
+  const seconds = String(utcDate.getSeconds()).padStart(2, '0');
+  
+  return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+}
