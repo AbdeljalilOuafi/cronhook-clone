@@ -223,10 +223,14 @@ class WebhookCreateSerializer(WebhookSerializer):
     
     class Meta(WebhookSerializer.Meta):
         fields = [
-            'name', 'url', 'http_method', 'headers', 'payload',
+            'id', 'name', 'url', 'http_method', 'headers', 'payload',
             'schedule_type', 'cron_expression', 'scheduled_at', 'timezone',
-            'max_retries', 'retry_delay', 'timeout', 'folder', 'account', 'account_id'
+            'max_retries', 'retry_delay', 'timeout', 'folder', 'account', 'account_id',
+            'is_active', 'folder_name', 'folder_color', 'account_name',
+            'execution_count', 'last_execution_status', 'created_at', 'updated_at'
         ]
+        read_only_fields = ['id', 'is_active', 'folder_name', 'folder_color', 'account_name', 
+                           'execution_count', 'last_execution_status', 'created_at', 'updated_at']
 
 
 class WebhookListSerializer(serializers.ModelSerializer):
