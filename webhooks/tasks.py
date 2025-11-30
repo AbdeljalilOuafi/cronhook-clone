@@ -26,6 +26,23 @@ def execute_webhook(self, webhook_id, attempt_number=1):
         logger.warning(f"Webhook {webhook_id} not found or inactive")
         return
     
+    # CRITICAL SAFEGUARD: Prevent re-execution of one-time webhooks
+    if webhook.schedule_type == 'once' and attempt_number == 1:
+        # Check if this webhook has already been successfully executed
+        previous_success = WebhookExecution.objects.filter(
+            webhook=webhook,
+            status='success'
+        ).exists()
+        
+        if previous_success:
+            logger.error(
+                f"CRITICAL: Prevented re-execution of one-time webhook {webhook.name} "
+                f"(ID: {webhook_id}) that was already successfully executed!"
+            )
+            webhook.is_active = False
+            webhook.save(update_fields=['is_active'])
+            return
+    
     # Create execution record
     execution = WebhookExecution.objects.create(
         webhook=webhook,
@@ -58,11 +75,19 @@ def execute_webhook(self, webhook_id, attempt_number=1):
         
         # Update webhook last execution time
         webhook.last_execution_at = timezone.now()
-        webhook.save(update_fields=['last_execution_at'])
         
         if response.is_success:
             logger.info(f"Webhook {webhook.name} executed successfully: {response.status_code}")
+            
+            # CRITICAL FIX: Deactivate one-time webhooks after successful execution
+            if webhook.schedule_type == 'once':
+                webhook.is_active = False
+                webhook.save(update_fields=['last_execution_at', 'is_active'])
+                logger.info(f"Deactivated one-time webhook {webhook.name} after successful execution")
+            else:
+                webhook.save(update_fields=['last_execution_at'])
         else:
+            webhook.save(update_fields=['last_execution_at'])
             logger.warning(f"Webhook {webhook.name} failed with status {response.status_code}")
             
             # Retry if attempts remaining
@@ -78,6 +103,12 @@ def execute_webhook(self, webhook_id, attempt_number=1):
                     args=[webhook_id, attempt_number + 1],
                     countdown=delay
                 )
+            else:
+                # CRITICAL FIX: Deactivate one-time webhooks after all retries exhausted
+                if webhook.schedule_type == 'once':
+                    webhook.is_active = False
+                    webhook.save(update_fields=['is_active'])
+                    logger.warning(f"Deactivated one-time webhook {webhook.name} after all retries exhausted")
         
         return {
             'status': execution.status,
@@ -101,6 +132,12 @@ def execute_webhook(self, webhook_id, attempt_number=1):
                 args=[webhook_id, attempt_number + 1],
                 countdown=delay
             )
+        else:
+            # CRITICAL FIX: Deactivate one-time webhooks after all retries exhausted
+            if webhook.schedule_type == 'once':
+                webhook.is_active = False
+                webhook.save(update_fields=['is_active'])
+                logger.warning(f"Deactivated one-time webhook {webhook.name} after timeout retries exhausted")
         
     except Exception as e:
         logger.error(f"Webhook {webhook.name} execution error: {str(e)}", exc_info=True)
@@ -118,6 +155,12 @@ def execute_webhook(self, webhook_id, attempt_number=1):
                 args=[webhook_id, attempt_number + 1],
                 countdown=delay
             )
+        else:
+            # CRITICAL FIX: Deactivate one-time webhooks after all retries exhausted
+            if webhook.schedule_type == 'once':
+                webhook.is_active = False
+                webhook.save(update_fields=['is_active'])
+                logger.warning(f"Deactivated one-time webhook {webhook.name} after exception retries exhausted")
 
 
 def schedule_webhook(webhook_id):
